@@ -7,7 +7,8 @@ export async function GET() {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const sql = neon(databaseUrl);
+  const sep = databaseUrl.includes('?') ? '&' : '?';
+  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
 
   const [metros, recentCrawls, stats] = await Promise.all([
     sql`SELECT id, name, enabled FROM metros ORDER BY id`,

@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const sql = neon(databaseUrl);
+  const sep = databaseUrl.includes('?') ? '&' : '?';
+  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
   const weedmaps = new WeedmapsAdapter();
 
   // Get enabled metros

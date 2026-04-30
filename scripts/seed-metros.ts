@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 const METROS = [
   { name: 'Phoenix, AZ', lat: 33.4484, lng: -112.074, radius_mi: 20 },
@@ -14,7 +15,8 @@ async function seed() {
     process.exit(1);
   }
 
-  const sql = neon(databaseUrl);
+  const sep = databaseUrl.includes('?') ? '&' : '?';
+  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
 
   console.log('Seeding metro areas...');
 

@@ -5,5 +5,6 @@ export function getDb() {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is not set');
   }
-  return neon(databaseUrl);
+  const sep = databaseUrl.includes('?') ? '&' : '?';
+  return neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
 }
