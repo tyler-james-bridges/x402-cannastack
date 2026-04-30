@@ -9,14 +9,9 @@ async function migrate() {
     process.exit(1);
   }
 
-  const sep = databaseUrl.includes('?') ? '&' : '?';
-  const rawSql = neon(databaseUrl);
-  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
+  const sql = neon(databaseUrl);
 
   console.log('Running migrations...');
-
-  // Create cannastack schema
-  await rawSql`CREATE SCHEMA IF NOT EXISTS cannastack`;
 
   // Enable trigram extension for fuzzy search
   await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`;

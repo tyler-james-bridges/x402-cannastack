@@ -13,8 +13,7 @@ async function main() {
     process.exit(1);
   }
 
-  const sep = databaseUrl.includes('?') ? '&' : '?';
-  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
+  const sql = neon(databaseUrl);
   const weedmaps = new WeedmapsAdapter();
 
   const metros = (await sql`SELECT * FROM metros WHERE enabled = true ORDER BY id`) as Metro[];

@@ -15,8 +15,7 @@ async function seed() {
     process.exit(1);
   }
 
-  const sep = databaseUrl.includes('?') ? '&' : '?';
-  const sql = neon(`${databaseUrl}${sep}options=-csearch_path%3Dcannastack%2Cpublic`);
+  const sql = neon(databaseUrl);
 
   console.log('Seeding metro areas...');
 
