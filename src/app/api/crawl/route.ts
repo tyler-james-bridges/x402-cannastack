@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { crawlMetro } from '@/lib/crawler';
 import { WeedmapsAdapter } from '@/lib/adapters/weedmaps';
+// import { LeaflyAdapter } from '@/lib/adapters/leafly';
+// Leafly adapter is ready but disabled until their public API is confirmed working.
+// Uncomment the import and the leafly crawl block below to enable.
 import type { Metro, CrawlResult } from '@/lib/types';
 
 export const maxDuration = 300; // 5 min max for Vercel
@@ -23,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const sql = neon(databaseUrl);
   const weedmaps = new WeedmapsAdapter();
+  // const leafly = new LeaflyAdapter();
 
   // Get enabled metros
   const metros = (await sql`SELECT * FROM metros WHERE enabled = true ORDER BY id`) as Metro[];
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest) {
       const result = await crawlMetro(sql, metro, weedmaps);
       results.push(result);
     } catch (err) {
-      console.error(`Crawl failed for ${metro.name}:`, err);
+      console.error(`Crawl failed for ${metro.name} (weedmaps):`, err);
       results.push({
         metroId: metro.id,
         source: weedmaps.name,
@@ -50,6 +54,24 @@ export async function GET(req: NextRequest) {
         durationMs: 0,
       });
     }
+
+    // Leafly crawl - uncomment when API access is confirmed
+    // try {
+    //   const result = await crawlMetro(sql, metro, leafly);
+    //   results.push(result);
+    // } catch (err) {
+    //   console.error(`Crawl failed for ${metro.name} (leafly):`, err);
+    //   results.push({
+    //     metroId: metro.id,
+    //     source: leafly.name,
+    //     dispensariesFound: 0,
+    //     itemsCrawled: 0,
+    //     itemsNew: 0,
+    //     itemsUpdated: 0,
+    //     errors: 1,
+    //     durationMs: 0,
+    //   });
+    // }
   }
 
   const totalItems = results.reduce((s, r) => s + r.itemsCrawled, 0);

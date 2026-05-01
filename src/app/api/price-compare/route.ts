@@ -3,6 +3,8 @@ import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchCategoryInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
+import { getCached, setCache } from '@/lib/cache';
+import { fallbackSearchCategory } from '@/lib/fallback';
 
 const CATEGORY_MAP: Record<string, string[]> = {
   flower: ['flower'],
@@ -77,6 +79,20 @@ export async function POST(req: NextRequest) {
     const genetics = body.genetics?.trim().toLowerCase() || null;
     const limit = Math.min(body.limit ?? 50, 100);
 
+    // Check cache
+    const sortedParams = JSON.stringify({
+      category: categoryInput,
+      genetics,
+      limit,
+      location,
+      radius: radiusMi,
+    });
+    const cacheKey = `price-compare:${sortedParams}`;
+    const cached = getCached<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+    }
+
     const geo = await geocode(location);
     if (!geo) {
       return NextResponse.json(
@@ -88,23 +104,32 @@ export async function POST(req: NextRequest) {
     const sql = getDb();
     const dispensaries = await findNearbyDispensaries(sql, geo.lat, geo.lng, radiusMi);
 
-    if (dispensaries.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        category: categoryInput,
-        location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
-        source: 'database',
-        dispensaries_searched: 0,
-        total_matches: 0,
-        results: [],
-        stats: { min: 0, max: 0, avg: 0, count: 0 },
-        summary: `No dispensaries found within ${radiusMi} miles of ${location}. This area may not be crawled yet.`,
-        response_ms: Date.now() - startMs,
-      });
-    }
+    let source: 'database' | 'live' = 'database';
+    let items: Record<string, unknown>[];
+    let dispCount = dispensaries.length;
 
-    const dispIds = dispensaries.map((d) => d.id as number);
-    const items = await searchCategoryInDB(sql, targetCategories, dispIds, genetics, limit);
+    if (dispensaries.length === 0) {
+      source = 'live';
+      const fallback = await fallbackSearchCategory(
+        geo.lat,
+        geo.lng,
+        targetCategories,
+        genetics,
+        radiusMi,
+        limit,
+      );
+      dispCount = fallback.dispensaries.length;
+      items = fallback.items as unknown as Record<string, unknown>[];
+    } else {
+      const dispIds = dispensaries.map((d) => d.id as number);
+      items = (await searchCategoryInDB(
+        sql,
+        targetCategories,
+        dispIds,
+        genetics,
+        limit,
+      )) as unknown as Record<string, unknown>[];
+    }
 
     const results = items.map((row) => {
       const { price, unit } = bestPrice(row);
@@ -129,29 +154,44 @@ export async function POST(req: NextRequest) {
         ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
         : 0;
 
-    let summary = `Compared ${results.length} ${categoryInput}${genetics ? ` (${genetics})` : ''} products across ${dispensaries.length} dispensaries near ${location}.`;
+    let summary = `Compared ${results.length} ${categoryInput}${genetics ? ` (${genetics})` : ''} products across ${dispCount} dispensaries near ${location}.`;
     if (results.length === 0) {
-      summary += ' No matching products found in crawled data.';
+      summary += ' No matching products found.';
     } else {
       summary += ` Cheapest: $${min}${results[0] ? ` (${results[0].name} at ${results[0].dispensary})` : ''}. Most expensive: $${max}. Average: $${avg}.`;
     }
+    if (source === 'live') {
+      summary += ' (live data)';
+    }
 
     const responseMs = Date.now() - startMs;
-    logRequest(sql, 'price-compare', location, geo.lat, geo.lng, { category: categoryInput, genetics, limit }, results.length, responseMs);
+    logRequest(
+      sql,
+      'price-compare',
+      location,
+      geo.lat,
+      geo.lng,
+      { category: categoryInput, genetics, limit, source },
+      results.length,
+      responseMs,
+    );
 
-    return NextResponse.json({
+    const responseData = {
       ok: true,
       category: categoryInput,
       genetics: genetics || 'all',
       location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
-      source: 'database',
-      dispensaries_searched: dispensaries.length,
+      source,
+      dispensaries_searched: dispCount,
       total_matches: results.length,
       results,
       stats: { min, max, avg, count: results.length },
       summary,
       response_ms: responseMs,
-    });
+    };
+
+    setCache(cacheKey, responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

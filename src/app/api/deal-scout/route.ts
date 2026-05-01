@@ -3,6 +3,8 @@ import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchDealsInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
+import { getCached, setCache } from '@/lib/cache';
+import { fallbackSearchDeals } from '@/lib/fallback';
 
 const CATEGORY_MAP: Record<string, string> = {
   flower: 'flower',
@@ -57,6 +59,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check cache
+    const sortedParams = JSON.stringify({
+      category: categoryInput,
+      location,
+      radius: radiusMi,
+    });
+    const cacheKey = `deal-scout:${sortedParams}`;
+    const cached = getCached<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+    }
+
     const geo = await geocode(location);
     if (!geo) {
       return NextResponse.json(
@@ -68,24 +82,100 @@ export async function POST(req: NextRequest) {
     const sql = getDb();
     const dispensaries = await findNearbyDispensaries(sql, geo.lat, geo.lng, radiusMi);
 
+    let source: 'database' | 'live' = 'database';
+
     if (dispensaries.length === 0) {
-      return NextResponse.json({
+      // Fallback to live Weedmaps data
+      source = 'live';
+      const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategory, radiusMi);
+
+      if (fallback.dispensaries.length === 0) {
+        const responseData = {
+          ok: true,
+          location: {
+            query: location,
+            lat: geo.lat,
+            lng: geo.lng,
+            resolved: geo.display_name,
+          },
+          source,
+          category: categoryInput || 'all',
+          total_dispensaries: 0,
+          deals_dispensaries: 0,
+          results: [],
+          summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+          response_ms: Date.now() - startMs,
+        };
+        return NextResponse.json(responseData);
+      }
+
+      const results = fallback.dealDisps.map((disp) => {
+        const dispItems = fallback.items
+          .filter((i) => i.dispensary_id === disp.id)
+          .slice(0, 10)
+          .map((item) => ({
+            name: item.name,
+            category: item.category || '',
+            brand: item.brand || 'Unknown',
+            genetics: item.genetics || 'unknown',
+            price: bestPrice(item as unknown as Record<string, unknown>),
+            orderable: item.orderable,
+          }));
+
+        return {
+          dispensary: disp.name,
+          rating: disp.rating,
+          reviews: disp.reviews_count,
+          type: disp.type || '',
+          address: disp.address || '',
+          city: disp.city || '',
+          url: disp.web_url || '',
+          deal_products: dispItems,
+        };
+      });
+
+      const totalProducts = results.reduce((sum, r) => sum + r.deal_products.length, 0);
+
+      let summary = `${fallback.dealDisps.length} of ${fallback.dispensaries.length} dispensaries near ${location} have active deals.`;
+      if (categoryInput) {
+        summary += ` Found ${totalProducts} ${categoryInput} products at deal dispensaries.`;
+      } else {
+        summary += ` Found ${totalProducts} products at deal dispensaries.`;
+      }
+      summary += ' (live data)';
+
+      const responseMs = Date.now() - startMs;
+      logRequest(
+        sql,
+        'deal-scout',
+        location,
+        geo.lat,
+        geo.lng,
+        { category: categoryInput, source },
+        totalProducts,
+        responseMs,
+      );
+
+      const responseData = {
         ok: true,
         location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
-        source: 'database',
+        source,
         category: categoryInput || 'all',
-        total_dispensaries: 0,
-        deals_dispensaries: 0,
-        results: [],
-        summary: `No dispensaries found within ${radiusMi} miles of ${location}. This area may not be crawled yet.`,
-        response_ms: Date.now() - startMs,
-      });
+        total_dispensaries: fallback.dispensaries.length,
+        deals_dispensaries: fallback.dealDisps.length,
+        results,
+        summary,
+        response_ms: responseMs,
+      };
+
+      setCache(cacheKey, responseData);
+      return NextResponse.json(responseData);
     }
 
+    // DB path (existing logic)
     const dispIds = dispensaries.map((d) => d.id as number);
     const { dealDisps, items, allCount } = await searchDealsInDB(sql, dispIds, targetCategory);
 
-    // Group items by dispensary
     const results = dealDisps.map((disp) => {
       const dispItems = (items || [])
         .filter((i) => i.dispensary_id === disp.id)
@@ -129,19 +219,31 @@ export async function POST(req: NextRequest) {
     }
 
     const responseMs = Date.now() - startMs;
-    logRequest(sql, 'deal-scout', location, geo.lat, geo.lng, { category: categoryInput }, totalProducts, responseMs);
+    logRequest(
+      sql,
+      'deal-scout',
+      location,
+      geo.lat,
+      geo.lng,
+      { category: categoryInput, source },
+      totalProducts,
+      responseMs,
+    );
 
-    return NextResponse.json({
+    const responseData = {
       ok: true,
       location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
-      source: 'database',
+      source,
       category: categoryInput || 'all',
       total_dispensaries: allCount,
       deals_dispensaries: dealDisps.length,
       results,
       summary,
       response_ms: responseMs,
-    });
+    };
+
+    setCache(cacheKey, responseData);
+    return NextResponse.json(responseData);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

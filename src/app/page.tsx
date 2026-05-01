@@ -29,6 +29,12 @@ const endpoints = [
     description: 'Find dispensaries with active deals near you',
     href: '/deal-scout',
   },
+  {
+    name: 'price-history',
+    price: '$0.02',
+    description: 'Track cannabis price changes over time by strain or dispensary',
+    href: '/price-history',
+  },
 ];
 
 export default function Home() {
