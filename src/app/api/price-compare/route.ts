@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchCategoryInDB } from '@/lib/queries';
+import { logRequest } from '@/lib/request-log';
 
 const CATEGORY_MAP: Record<string, string[]> = {
   flower: ['flower'],
@@ -135,6 +136,9 @@ export async function POST(req: NextRequest) {
       summary += ` Cheapest: $${min}${results[0] ? ` (${results[0].name} at ${results[0].dispensary})` : ''}. Most expensive: $${max}. Average: $${avg}.`;
     }
 
+    const responseMs = Date.now() - startMs;
+    logRequest(sql, 'price-compare', location, geo.lat, geo.lng, { category: categoryInput, genetics, limit }, results.length, responseMs);
+
     return NextResponse.json({
       ok: true,
       category: categoryInput,
@@ -146,7 +150,7 @@ export async function POST(req: NextRequest) {
       results,
       stats: { min, max, avg, count: results.length },
       summary,
-      response_ms: Date.now() - startMs,
+      response_ms: responseMs,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

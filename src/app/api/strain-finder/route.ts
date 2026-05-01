@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchStrainInDB } from '@/lib/queries';
+import { logRequest } from '@/lib/request-log';
 
 function bestPrice(row: Record<string, unknown>): number {
   if (Number(row.price_unit) > 0) return Number(row.price_unit);
@@ -125,6 +126,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const responseMs = Date.now() - startMs;
+    logRequest(sql, 'strain-finder', location, geo.lat, geo.lng, { strain, radius: radiusMi }, totalMatches, responseMs);
+
     return NextResponse.json({
       ok: true,
       strain,
@@ -133,7 +137,7 @@ export async function POST(req: NextRequest) {
       dispensaries_searched: dispensaries.length,
       results,
       summary,
-      response_ms: Date.now() - startMs,
+      response_ms: responseMs,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

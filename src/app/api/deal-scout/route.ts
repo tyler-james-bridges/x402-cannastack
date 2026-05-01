@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchDealsInDB } from '@/lib/queries';
+import { logRequest } from '@/lib/request-log';
 
 const CATEGORY_MAP: Record<string, string> = {
   flower: 'flower',
@@ -127,6 +128,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const responseMs = Date.now() - startMs;
+    logRequest(sql, 'deal-scout', location, geo.lat, geo.lng, { category: categoryInput }, totalProducts, responseMs);
+
     return NextResponse.json({
       ok: true,
       location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
@@ -136,7 +140,7 @@ export async function POST(req: NextRequest) {
       deals_dispensaries: dealDisps.length,
       results,
       summary,
-      response_ms: Date.now() - startMs,
+      response_ms: responseMs,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
