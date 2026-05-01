@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 const endpoints = [
   {
     name: 'weedmaps-recs',
@@ -13,16 +15,19 @@ const endpoints = [
     name: 'strain-finder',
     price: '$0.02',
     description: 'Cross-dispensary strain search sorted by price',
+    href: '/strain-finder',
   },
   {
     name: 'price-compare',
     price: '$0.02',
     description: 'Category price comparison across nearby dispensaries',
+    href: '/price-compare',
   },
   {
     name: 'deal-scout',
     price: '$0.02',
     description: 'Find dispensaries with active deals near you',
+    href: '/deal-scout',
   },
 ];
 
@@ -48,7 +53,13 @@ export default function Home() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-base font-mono font-bold text-white">{ep.name}</p>
+                    {'href' in ep && ep.href ? (
+                      <Link href={ep.href} className="text-base font-mono font-bold text-white hover:text-white/80 transition-colors">
+                        {ep.name}
+                      </Link>
+                    ) : (
+                      <p className="text-base font-mono font-bold text-white">{ep.name}</p>
+                    )}
                     <p className="text-sm text-white/40 font-mono mt-1">{ep.description}</p>
                   </div>
                   <span className="text-sm font-mono text-green-400 shrink-0">{ep.price}</span>
