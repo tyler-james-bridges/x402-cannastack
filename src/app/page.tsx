@@ -1,119 +1,63 @@
-import Link from 'next/link';
+// src/app/page.tsx
+// Drop-in replacement for the homepage. Server component shell; the live
+// pieces are client components below.
 
-const endpoints = [
-  {
-    name: 'weedmaps-recs',
-    price: '$0.03',
-    description: 'Dispensary finder + product recommendations near any US location',
-  },
-  {
-    name: 'night-out',
-    price: '$0.05',
-    description: 'Multi-source local planner: dispensaries + bars + restaurants + breweries',
-  },
-  {
-    name: 'strain-finder',
-    price: '$0.02',
-    description: 'Cross-dispensary strain search sorted by price',
-    href: '/strain-finder',
-  },
-  {
-    name: 'price-compare',
-    price: '$0.02',
-    description: 'Category price comparison across nearby dispensaries',
-    href: '/price-compare',
-  },
-  {
-    name: 'deal-scout',
-    price: '$0.02',
-    description: 'Find dispensaries with active deals near you',
-    href: '/deal-scout',
-  },
-  {
-    name: 'price-history',
-    price: '$0.02',
-    description: 'Track cannabis price changes over time by strain or dispensary',
-    href: '/price-history',
-  },
-];
+import { HeroPrompt } from '@/components/home/hero-prompt';
+import { LiveMeter } from '@/components/home/live-meter';
+import { EventStream } from '@/components/home/event-stream';
+import { UsMap } from '@/components/home/us-map';
+import { RateCard } from '@/components/home/rate-card';
+import { CurlSnippet } from '@/components/home/curl-snippet';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-4xl md:text-5xl font-bold font-mono">x402-cannastack</h1>
-        <p className="mt-4 text-lg text-white/50 font-mono max-w-xl leading-relaxed">
-          Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability.
-          Pay per request via x402. No API keys. No contracts.
-        </p>
-
-        <div className="mt-12">
-          <h2 className="text-sm font-mono uppercase tracking-wider text-white/40 mb-6">
-            Live endpoints
-          </h2>
-          <div className="space-y-3">
-            {endpoints.map((ep) => (
-              <div
-                key={ep.name}
-                className="rounded-xl border border-white/10 bg-white/[0.02] p-5 hover:border-white/20 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    {'href' in ep && ep.href ? (
-                      <Link href={ep.href} className="text-base font-mono font-bold text-white hover:text-white/80 transition-colors">
-                        {ep.name}
-                      </Link>
-                    ) : (
-                      <p className="text-base font-mono font-bold text-white">{ep.name}</p>
-                    )}
-                    <p className="text-sm text-white/40 font-mono mt-1">{ep.description}</p>
-                  </div>
-                  <span className="text-sm font-mono text-green-400 shrink-0">{ep.price}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-16 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-          <h2 className="text-sm font-mono uppercase tracking-wider text-white/40 mb-4">
-            How it works
-          </h2>
-          <div className="space-y-3 text-sm font-mono text-white/40">
-            <div className="flex gap-3">
-              <span className="text-white/20 shrink-0">1.</span>
-              <span>Pick an endpoint. Send a POST with your query.</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="text-white/20 shrink-0">2.</span>
-              <span>Pay with USDC via x402 (automatic, no wallet setup for agents).</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="text-white/20 shrink-0">3.</span>
-              <span>Get structured cannabis data. Use it however you want.</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-          <h2 className="text-sm font-mono uppercase tracking-wider text-white/40 mb-4">
-            Quick start
-          </h2>
-          <div className="rounded-lg border border-white/5 bg-black p-4 overflow-x-auto">
-            <pre className="text-[12px] text-white/50 font-mono whitespace-pre">
-{`bankr x402 call \\
-  https://x402.bankr.bot/.../strain-finder \\
-  -d '{"strain":"Blue Dream","location":"Phoenix, AZ"}'`}
-            </pre>
-          </div>
-        </div>
-
-        <div className="mt-16 text-center">
-          <p className="text-[11px] text-white/20 font-mono">
-            Built on x402. Powered by public data.
-          </p>
-        </div>
+    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans">
+      {/* Top status strip */}
+      <div className="flex items-center gap-4 px-6 py-3 border-b border-[#22262A] text-xs font-mono">
+        <span className="flex items-center gap-2 font-bold tracking-wide">
+          <span className="w-2.5 h-2.5 bg-[#9DFFB5] rounded-sm shadow-[0_0_12px_#9DFFB5]" />
+          CANNASTACK
+        </span>
+        <span className="text-[#4F5354]">/</span>
+        <span className="text-[#8A8E8C]">agent-native cannabis data · x402</span>
+        <LiveMeter variant="strip" className="ml-auto" />
+        <span className="text-[#4F5354] hidden md:inline">│</span>
+        <a href="/docs" className="hidden md:inline hover:text-[#9DFFB5]">docs</a>
+        <a href="https://github.com" className="hidden md:inline hover:text-[#9DFFB5]">github</a>
       </div>
+
+      {/* HERO — prompt + live response */}
+      <section className="px-6 lg:px-9 py-10 border-b border-[#22262A]">
+        <HeroPrompt />
+      </section>
+
+      {/* MIDDLE — meter + map + event stream */}
+      <section className="px-6 lg:px-9 py-7 border-b border-[#22262A] grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-7">
+        <div className="flex flex-col gap-4 min-w-0">
+          <LiveMeter variant="hero" />
+          <div className="flex-1 min-h-[220px] relative border border-[#22262A] rounded-md overflow-hidden bg-[#111315]">
+            <UsMap />
+            <div className="absolute top-2.5 left-3 text-[10px] font-mono text-[#4F5354] tracking-[1.4px]">
+              LIVE QUERIES
+            </div>
+          </div>
+        </div>
+        <EventStream />
+      </section>
+
+      {/* BOTTOM — rate card + curl */}
+      <section className="px-6 lg:px-9 py-6 grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-7">
+        <RateCard />
+        <CurlSnippet />
+      </section>
+
+      <footer className="px-6 lg:px-9 py-6 border-t border-[#22262A] text-xs font-mono text-[#4F5354] flex flex-wrap gap-4">
+        <span>cannastack · public cannabis data, priced like an API call</span>
+        <span className="ml-auto">
+          <a href="/status" className="hover:text-[#9DFFB5]">status</a> ·{' '}
+          <a href="/docs" className="hover:text-[#9DFFB5]">docs</a>
+        </span>
+      </footer>
     </main>
   );
 }

@@ -1,19 +1,25 @@
+import { PageShell } from '@/components/home/page-shell';
 import { PriceHistorySearch } from '@/components/price-history-search';
+
+export const metadata = {
+  title: 'Price History · cannastack',
+  description:
+    'Track cannabis price changes over time by strain or dispensary. Spot trends and the best time to buy.',
+};
 
 export default function PriceHistoryPage() {
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-3xl md:text-4xl font-bold font-mono">price-history</h1>
-        <p className="mt-3 text-sm text-white/50 font-mono max-w-xl leading-relaxed">
-          Track cannabis price changes over time. Search by strain or dispensary to see historical
-          pricing trends and spot the best time to buy.
-        </p>
-
-        <div className="mt-10">
-          <PriceHistorySearch />
-        </div>
-      </div>
-    </main>
+    <PageShell
+      eyebrow="price-history · $0.02"
+      title={
+        <>
+          Has the price<br />
+          <span className="text-[#9DFFB5]">moved this week?</span>
+        </>
+      }
+      subtitle="Track price changes over time by strain or dispensary. See trend, percent change, and every recorded data point."
+    >
+      <PriceHistorySearch />
+    </PageShell>
   );
 }

@@ -37,14 +37,14 @@ interface SearchResult {
 }
 
 const trendIndicator: Record<string, { arrow: string; color: string }> = {
-  up: { arrow: '^', color: 'text-red-400' },
-  down: { arrow: 'v', color: 'text-green-400' },
-  stable: { arrow: '-', color: 'text-white/40' },
+  up: { arrow: '↑', color: 'text-[#FF7361]' },
+  down: { arrow: '↓', color: 'text-[#9DFFB5]' },
+  stable: { arrow: '·', color: 'text-[#8A8E8C]' },
 };
 
 function formatPrice(point: PricePoint): string {
   const p = Number(point.price_unit) || Number(point.price_eighth) || Number(point.price_gram);
-  return p > 0 ? `$${p}` : '--';
+  return p > 0 ? `$${p}` : '—';
 }
 
 function formatDate(iso: string): string {
@@ -113,63 +113,66 @@ export function PriceHistorySearch() {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => setMode('strain')}
-          className={`rounded-lg px-4 py-2 font-mono text-sm transition-colors ${
-            mode === 'strain'
-              ? 'bg-white text-black font-bold'
-              : 'border border-white/20 text-white/50 hover:text-white/80'
-          }`}
-        >
-          By Strain
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('dispensary')}
-          className={`rounded-lg px-4 py-2 font-mono text-sm transition-colors ${
-            mode === 'dispensary'
-              ? 'bg-white text-black font-bold'
-              : 'border border-white/20 text-white/50 hover:text-white/80'
-          }`}
-        >
-          By Dispensary
-        </button>
+        {(['strain', 'dispensary'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`font-mono text-xs tracking-[1.4px] px-3 py-1.5 border rounded ${
+              mode === m
+                ? 'border-[#9DFFB5] text-[#9DFFB5] bg-[#9DFFB5]/10'
+                : 'border-[#22262A] text-[#8A8E8C] bg-[#111315] hover:text-[#F1F1EE] hover:border-[#4F5354]'
+            }`}
+          >
+            BY {m.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       <form onSubmit={handleSearch} className="space-y-3">
-        {mode === 'strain' ? (
-          <input
-            type="text"
-            value={strain}
-            onChange={(e) => setStrain(e.target.value)}
-            placeholder="Strain name (e.g. Blue Dream)"
-            className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:border-white/40 transition-colors"
-          />
-        ) : (
-          <>
+        <div className="border border-[#22262A] bg-[#111315] rounded-md flex items-center gap-3 px-5 py-4">
+          <span className="font-mono text-lg text-[#9DFFB5]">›</span>
+          {mode === 'strain' ? (
+            <input
+              type="text"
+              value={strain}
+              onChange={(e) => setStrain(e.target.value)}
+              placeholder="Strain name (e.g. Blue Dream)"
+              className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
+            />
+          ) : (
             <input
               type="text"
               value={dispensary}
               onChange={(e) => setDispensary(e.target.value)}
               placeholder="Dispensary name (e.g. JARS Cannabis)"
-              className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:border-white/40 transition-colors"
+              className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
             />
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 font-mono text-sm text-white/70 outline-none focus:border-white/30 transition-colors"
-            >
-              <option value="">All categories</option>
-              <option value="flower">Flower</option>
-              <option value="edibles">Edibles</option>
-              <option value="vape pens">Vape Pens</option>
-              <option value="concentrates">Concentrates</option>
-              <option value="pre-rolls">Pre-Rolls</option>
-              <option value="drinks">Drinks</option>
-              <option value="tinctures">Tinctures</option>
-            </select>
-          </>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="font-mono text-[11px] tracking-[1.4px] px-2.5 py-1 border rounded text-[#9DFFB5] border-[#9DFFB5] disabled:text-[#4F5354] disabled:border-[#22262A] disabled:opacity-60"
+          >
+            {loading ? 'RUNNING…' : '↵ SEARCH · $0.02'}
+          </button>
+        </div>
+
+        {mode === 'dispensary' && (
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-[#22262A] bg-[#111315] rounded-md px-4 py-3 font-mono text-sm text-[#F1F1EE] outline-none focus:border-[#4F5354]"
+          >
+            <option value="" className="bg-[#0B0C0D]">All categories</option>
+            <option value="flower" className="bg-[#0B0C0D]">Flower</option>
+            <option value="edibles" className="bg-[#0B0C0D]">Edibles</option>
+            <option value="vape pens" className="bg-[#0B0C0D]">Vape Pens</option>
+            <option value="concentrates" className="bg-[#0B0C0D]">Concentrates</option>
+            <option value="pre-rolls" className="bg-[#0B0C0D]">Pre-Rolls</option>
+            <option value="drinks" className="bg-[#0B0C0D]">Drinks</option>
+            <option value="tinctures" className="bg-[#0B0C0D]">Tinctures</option>
+          </select>
         )}
 
         <input
@@ -177,102 +180,102 @@ export function PriceHistorySearch() {
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="Location (optional, narrows to nearby dispensaries)"
-          className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30 transition-colors"
+          className="w-full border border-[#22262A] bg-[#111315] rounded-md px-4 py-3 font-mono text-sm text-[#F1F1EE] placeholder-[#4F5354] outline-none focus:border-[#4F5354]"
         />
 
-        <div className="flex gap-3">
-          <select
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-            className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 font-mono text-sm text-white/70 outline-none focus:border-white/30 transition-colors"
-          >
-            <option value="7">7 days</option>
-            <option value="14">14 days</option>
-            <option value="30">30 days</option>
-            <option value="90">90 days</option>
-          </select>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 rounded-lg bg-white px-6 py-2.5 font-mono text-sm font-bold text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Searching...' : 'Search Price History'}
-          </button>
+        <div className="flex gap-2 pt-1">
+          <span className="font-mono text-[10px] text-[#4F5354] tracking-[1.4px] self-center mr-1.5">
+            WINDOW
+          </span>
+          {['7', '14', '30', '90'].map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDays(d)}
+              className={`px-3 py-1.5 border rounded-full text-xs font-mono ${
+                days === d
+                  ? 'border-[#9DFFB5] text-[#9DFFB5] bg-[#9DFFB5]/10'
+                  : 'border-[#22262A] text-[#8A8E8C] bg-[#111315] hover:text-[#F1F1EE] hover:border-[#4F5354]'
+              }`}
+            >
+              {d}d
+            </button>
+          ))}
         </div>
       </form>
 
       {error && (
-        <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono">
+        <div className="mt-6 border border-[#FF7361]/30 bg-[#FF7361]/10 rounded-md px-4 py-3 text-sm text-[#FF7361] font-mono">
           {error}
         </div>
       )}
 
       {result && (
-        <div className="mt-8 space-y-6">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <p className="text-sm text-white/60 font-mono">{result.summary}</p>
+        <div className="mt-8 space-y-5">
+          <div className="border border-[#22262A] bg-[#111315] rounded-md p-4">
+            <p className="text-sm text-[#F1F1EE] font-mono">{result.summary}</p>
           </div>
 
           {result.stats && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="text-sm font-mono uppercase tracking-wider text-white/40 mb-4">
-                Stats
-              </h3>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div>
-                  <p className="text-[11px] font-mono text-white/30">Current</p>
-                  <p className="text-lg font-mono font-bold text-green-400">
-                    ${result.stats.current}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-mono text-white/30">
-                    {result.query.days}d ago
-                  </p>
-                  <p className="text-lg font-mono font-bold text-white/60">
-                    ${result.stats.oldest}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-mono text-white/30">Change</p>
-                  <p
-                    className={`text-lg font-mono font-bold ${
-                      result.stats.change_pct > 0
-                        ? 'text-red-400'
-                        : result.stats.change_pct < 0
-                          ? 'text-green-400'
-                          : 'text-white/40'
-                    }`}
-                  >
-                    {result.stats.change_pct > 0 ? '+' : ''}
-                    {result.stats.change_pct}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-mono text-white/30">Trend</p>
-                  <p
-                    className={`text-lg font-mono font-bold ${trendIndicator[result.stats.trend].color}`}
-                  >
-                    {trendIndicator[result.stats.trend].arrow} {result.stats.trend}
-                  </p>
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="border border-[#22262A] bg-[#111315] rounded-md p-3">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px]">
+                  Current
+                </p>
+                <p className="font-mono text-xl font-bold text-[#9DFFB5] tabular-nums mt-1">
+                  ${result.stats.current}
+                </p>
+              </div>
+              <div className="border border-[#22262A] bg-[#111315] rounded-md p-3">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px]">
+                  {result.query.days}d ago
+                </p>
+                <p className="font-mono text-xl font-bold text-[#F1F1EE] tabular-nums mt-1">
+                  ${result.stats.oldest}
+                </p>
+              </div>
+              <div className="border border-[#22262A] bg-[#111315] rounded-md p-3">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px]">
+                  Change
+                </p>
+                <p
+                  className={`font-mono text-xl font-bold tabular-nums mt-1 ${
+                    result.stats.change_pct > 0
+                      ? 'text-[#FF7361]'
+                      : result.stats.change_pct < 0
+                        ? 'text-[#9DFFB5]'
+                        : 'text-[#8A8E8C]'
+                  }`}
+                >
+                  {result.stats.change_pct > 0 ? '+' : ''}
+                  {result.stats.change_pct}%
+                </p>
+              </div>
+              <div className="border border-[#22262A] bg-[#111315] rounded-md p-3">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px]">
+                  Trend
+                </p>
+                <p
+                  className={`font-mono text-xl font-bold mt-1 ${trendIndicator[result.stats.trend].color}`}
+                >
+                  {trendIndicator[result.stats.trend].arrow} {result.stats.trend}
+                </p>
               </div>
             </div>
           )}
 
           {result.history.length === 0 ? (
-            <p className="text-sm text-white/40 font-mono text-center py-8">
+            <p className="text-sm text-[#8A8E8C] font-mono text-center py-8">
               No price changes recorded for this query.
             </p>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-              <div className="divide-y divide-white/5">
+            <div className="border border-[#22262A] bg-[#111315] rounded-md overflow-hidden">
+              <div className="divide-y divide-[#22262A]">
                 {result.history.map((point, i) => {
                   const price = formatPrice(point);
                   const prevPoint = result.history[i + 1];
                   let changeStr = '';
-                  let changeColor = 'text-white/30';
+                  let changeColor = 'text-[#4F5354]';
 
                   if (prevPoint) {
                     const curr =
@@ -288,38 +291,36 @@ export function PriceHistorySearch() {
                     if (curr > 0 && prev > 0) {
                       const diff = Math.round(((curr - prev) / prev) * 10000) / 100;
                       if (diff > 0) {
-                        changeStr = `^ +${diff}%`;
-                        changeColor = 'text-red-400';
+                        changeStr = `↑ +${diff}%`;
+                        changeColor = 'text-[#FF7361]';
                       } else if (diff < 0) {
-                        changeStr = `v ${diff}%`;
-                        changeColor = 'text-green-400';
+                        changeStr = `↓ ${diff}%`;
+                        changeColor = 'text-[#9DFFB5]';
                       }
                     }
                   }
 
                   return (
-                    <div key={i} className="p-4 hover:bg-white/[0.02] transition-colors">
+                    <div key={i} className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-mono font-bold text-white/90">
-                            {point.item_name}
-                          </p>
+                          <p className="text-sm font-semibold text-[#F1F1EE]">{point.item_name}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[11px] font-mono text-white/30">
+                            <span className="text-[11px] font-mono text-[#8A8E8C]">
                               {point.dispensary_name}
                             </span>
                             {point.brand && (
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 text-white/40">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#22262A] text-[#8A8E8C]">
                                 {point.brand}
                               </span>
                             )}
-                            <span className="text-[10px] font-mono text-white/20">
+                            <span className="text-[10px] font-mono text-[#4F5354]">
                               {formatDate(point.recorded_at)}
                             </span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="text-sm font-mono font-bold text-green-400">
+                          <span className="font-mono text-base font-bold text-[#9DFFB5] tabular-nums">
                             {price}
                           </span>
                           {changeStr && (
@@ -335,12 +336,6 @@ export function PriceHistorySearch() {
               </div>
             </div>
           )}
-
-          <div className="rounded-lg border border-white/5 bg-white/[0.01] p-4 text-center">
-            <p className="text-[11px] text-white/25 font-mono">
-              Powered by cannastack. Full API: $0.02/req via x402.
-            </p>
-          </div>
         </div>
       )}
     </div>

@@ -34,21 +34,21 @@ interface SearchResult {
 }
 
 const geneticsColor: Record<string, string> = {
-  indica: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  sativa: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  hybrid: 'bg-green-500/20 text-green-300 border-green-500/30',
+  indica: 'text-[#C8A6FF] border-[#C8A6FF]/30 bg-[#C8A6FF]/10',
+  sativa: 'text-[#FFB976] border-[#FFB976]/30 bg-[#FFB976]/10',
+  hybrid: 'text-[#9DFFB5] border-[#9DFFB5]/30 bg-[#9DFFB5]/10',
 };
 
 const categoryOptions = [
-  { value: '', label: 'All categories' },
-  { value: 'flower', label: 'Flower' },
-  { value: 'edibles', label: 'Edibles' },
-  { value: 'vape', label: 'Vape Pens' },
-  { value: 'concentrates', label: 'Concentrates' },
-  { value: 'pre-rolls', label: 'Pre-Rolls' },
-  { value: 'drinks', label: 'Drinks' },
-  { value: 'tinctures', label: 'Tinctures' },
-  { value: 'topicals', label: 'Topicals' },
+  { value: '', label: 'all categories' },
+  { value: 'flower', label: 'flower' },
+  { value: 'edibles', label: 'edibles' },
+  { value: 'vape', label: 'vape' },
+  { value: 'concentrates', label: 'concentrates' },
+  { value: 'pre-rolls', label: 'pre-rolls' },
+  { value: 'drinks', label: 'drinks' },
+  { value: 'tinctures', label: 'tinctures' },
+  { value: 'topicals', label: 'topicals' },
 ];
 
 export function DealScoutSearch() {
@@ -91,66 +91,73 @@ export function DealScoutSearch() {
   return (
     <div>
       <form onSubmit={handleSearch} className="space-y-3">
-        <div className="flex gap-3">
+        <div className="border border-[#22262A] bg-[#111315] rounded-md flex items-center gap-3 px-5 py-4">
+          <span className="font-mono text-lg text-[#9DFFB5]">›</span>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="City or address (US only)"
-            className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:border-white/40 transition-colors"
+            className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
             required
           />
           <button
             type="submit"
-            disabled={loading}
-            className="rounded-lg bg-white px-6 py-3 font-mono text-sm font-bold text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+            disabled={loading || !location.trim()}
+            className="font-mono text-[11px] tracking-[1.4px] px-2.5 py-1 border rounded text-[#9DFFB5] border-[#9DFFB5] disabled:text-[#4F5354] disabled:border-[#22262A] disabled:opacity-60"
           >
-            {loading ? 'Scouting...' : 'Scout'}
+            {loading ? 'RUNNING…' : '↵ SCOUT · $0.02'}
           </button>
         </div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 font-mono text-sm text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer"
-        >
+        <div className="flex gap-2 flex-wrap pt-1">
+          <span className="font-mono text-[10px] text-[#4F5354] tracking-[1.4px] self-center mr-1.5">
+            CATEGORY
+          </span>
           {categoryOptions.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-black text-white">
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setCategory(opt.value)}
+              className={`px-3 py-1.5 border rounded-full text-xs font-mono transition-colors ${
+                category === opt.value
+                  ? 'border-[#9DFFB5] text-[#9DFFB5] bg-[#9DFFB5]/10'
+                  : 'border-[#22262A] text-[#8A8E8C] bg-[#111315] hover:text-[#F1F1EE] hover:border-[#4F5354]'
+              }`}
+            >
               {opt.label}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </form>
 
       {error && (
-        <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono">
+        <div className="mt-6 border border-[#FF7361]/30 bg-[#FF7361]/10 rounded-md px-4 py-3 text-sm text-[#FF7361] font-mono">
           {error}
         </div>
       )}
 
       {result && (
-        <div className="mt-8 space-y-6">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <p className="text-sm text-white/60 font-mono">{result.summary}</p>
-            <p className="mt-2 text-[11px] text-white/30 font-mono">
-              {result.location.resolved}
-            </p>
+        <div className="mt-8 space-y-5">
+          <div className="border border-[#22262A] bg-[#111315] rounded-md p-4">
+            <p className="text-sm text-[#F1F1EE] font-mono">{result.summary}</p>
+            <p className="mt-2 text-[11px] text-[#4F5354] font-mono">{result.location.resolved}</p>
           </div>
 
           {result.deals_dispensaries > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 text-center">
-                <p className="text-lg font-mono font-bold text-yellow-400">
+              <div className="border border-[#FFB976]/30 bg-[#FFB976]/5 rounded-md p-3 text-center">
+                <p className="font-mono text-xl font-bold text-[#FFB976] tabular-nums">
                   {result.deals_dispensaries}
                 </p>
-                <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px] mt-1">
                   With deals
                 </p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-center">
-                <p className="text-lg font-mono font-bold text-white/70">
+              <div className="border border-[#22262A] bg-[#111315] rounded-md p-3 text-center">
+                <p className="font-mono text-xl font-bold text-[#F1F1EE] tabular-nums">
                   {result.total_dispensaries}
                 </p>
-                <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                <p className="text-[10px] font-mono text-[#4F5354] uppercase tracking-[1.4px] mt-1">
                   Total nearby
                 </p>
               </div>
@@ -158,79 +165,84 @@ export function DealScoutSearch() {
           )}
 
           {result.results.length === 0 ? (
-            <p className="text-sm text-white/40 font-mono text-center py-8">
+            <p className="text-sm text-[#8A8E8C] font-mono text-center py-8">
               No dispensaries with active deals found near this location.
             </p>
           ) : (
             result.results.map((disp, i) => (
               <div
                 key={i}
-                className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden"
+                className="border border-[#22262A] bg-[#111315] rounded-md overflow-hidden"
               >
-                <div className="p-4 border-b border-white/5">
+                <div className="p-4 border-b border-[#22262A]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <a
-                        href={disp.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base font-bold font-mono text-white hover:text-white/80 transition-colors"
-                      >
-                        {disp.dispensary}
-                      </a>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="text-[11px] font-mono text-yellow-400">
-                          {'*'.repeat(Math.round(disp.rating))} {disp.rating}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[11px] text-[#4F5354]">
+                          {String(i + 1).padStart(2, '0')}
                         </span>
-                        <span className="text-[11px] font-mono text-white/30">
-                          ({disp.reviews} reviews)
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-yellow-500/20 text-yellow-400/60 uppercase">
-                          Deals
+                        <a
+                          href={disp.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-base font-semibold text-[#F1F1EE] hover:text-[#9DFFB5]"
+                        >
+                          {disp.dispensary}
+                        </a>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[#FFB976]/30 bg-[#FFB976]/10 text-[#FFB976] tracking-[1.4px]">
+                          DEALS
                         </span>
                       </div>
-                      {disp.address && (
-                        <p className="text-[11px] text-white/25 font-mono mt-1">
-                          {disp.address}, {disp.city}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 ml-7">
+                        <span className="text-[11px] font-mono text-[#FFB976]">
+                          ★ {disp.rating}
+                        </span>
+                        <span className="text-[11px] font-mono text-[#4F5354]">
+                          ({disp.reviews} reviews)
+                        </span>
+                        {disp.address && (
+                          <span className="text-[11px] text-[#8A8E8C] font-mono">
+                            · {disp.address}, {disp.city}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {disp.deal_products.length > 0 ? (
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-[#22262A]">
                     {disp.deal_products.map((prod, j) => (
-                      <div key={j} className="p-4 hover:bg-white/[0.02] transition-colors">
+                      <div key={j} className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-mono font-bold text-white/90 leading-snug">
+                            <p className="text-sm font-semibold text-[#F1F1EE] leading-snug">
                               {prod.name}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 text-white/40">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#22262A] text-[#8A8E8C]">
                                 {prod.category}
                               </span>
                               {prod.genetics && prod.genetics !== 'unknown' && (
                                 <span
-                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${geneticsColor[prod.genetics] || 'border-white/10 text-white/40'}`}
+                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${geneticsColor[prod.genetics] || 'border-[#22262A] text-[#8A8E8C]'}`}
                                 >
                                   {prod.genetics}
                                 </span>
                               )}
-                              <span className="text-[11px] font-mono text-white/30">
+                              <span className="text-[11px] font-mono text-[#8A8E8C]">
                                 {prod.brand}
                               </span>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
                             {prod.price > 0 && (
-                              <span className="text-sm font-mono font-bold text-green-400">
+                              <span className="font-mono text-base font-bold text-[#9DFFB5] tabular-nums">
                                 ${prod.price}
                               </span>
                             )}
                             {prod.orderable && (
-                              <p className="text-[10px] font-mono text-white/30 mt-0.5">
+                              <p className="text-[10px] font-mono text-[#4F5354] mt-0.5">
                                 Order online
                               </p>
                             )}
@@ -241,21 +253,14 @@ export function DealScoutSearch() {
                   </div>
                 ) : (
                   <div className="p-4">
-                    <p className="text-[11px] text-white/30 font-mono">
-                      This dispensary has active deals. Visit their page for details.
+                    <p className="text-[11px] text-[#8A8E8C] font-mono">
+                      Active deals on this menu. Visit the dispensary page for specifics.
                     </p>
                   </div>
                 )}
               </div>
             ))
           )}
-
-          <div className="rounded-lg border border-white/5 bg-white/[0.01] p-4 text-center">
-            <p className="text-[11px] text-white/25 font-mono">
-              Powered by cannastack. Sale flags from source data; individual sale prices may not be
-              available. Full API: $0.02/req via x402.
-            </p>
-          </div>
         </div>
       )}
     </div>

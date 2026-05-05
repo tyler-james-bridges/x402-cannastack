@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
 
     const sql = getDb();
     let dispIds: number[] | null = null;
+    let geoLat: number | null = null;
+    let geoLng: number | null = null;
 
     if (location) {
       const geo = await geocode(location);
@@ -63,6 +65,8 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         );
       }
+      geoLat = geo.lat;
+      geoLng = geo.lng;
 
       const dispensaries = await findNearbyDispensaries(sql, geo.lat, geo.lng, 15);
       if (dispensaries.length === 0) {
@@ -176,8 +180,8 @@ export async function POST(req: NextRequest) {
       sql,
       'price-history',
       location,
-      null,
-      null,
+      geoLat,
+      geoLng,
       { strain, dispensary: dispensaryName, category, days },
       history.length,
       responseMs,

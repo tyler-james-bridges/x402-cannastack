@@ -33,9 +33,9 @@ interface SearchResult {
 }
 
 const geneticsColor: Record<string, string> = {
-  indica: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  sativa: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  hybrid: 'bg-green-500/20 text-green-300 border-green-500/30',
+  indica: 'text-[#C8A6FF] border-[#C8A6FF]/30 bg-[#C8A6FF]/10',
+  sativa: 'text-[#FFB976] border-[#FFB976]/30 bg-[#FFB976]/10',
+  hybrid: 'text-[#9DFFB5] border-[#9DFFB5]/30 bg-[#9DFFB5]/10',
 };
 
 const exampleStrains = ['Blue Dream', 'Gelato', 'OG Kush', 'Wedding Cake', 'Girl Scout Cookies'];
@@ -77,21 +77,22 @@ export function StrainFinderSearch() {
   return (
     <div>
       <form onSubmit={handleSearch} className="space-y-3">
-        <div className="flex gap-3">
+        <div className="border border-[#22262A] bg-[#111315] rounded-md flex items-center gap-3 px-5 py-4">
+          <span className="font-mono text-lg text-[#9DFFB5]">›</span>
           <input
             type="text"
             value={strain}
             onChange={(e) => setStrain(e.target.value)}
             placeholder="Strain name (e.g. Blue Dream)"
-            className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:border-white/40 transition-colors"
+            className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
             required
           />
           <button
             type="submit"
-            disabled={loading}
-            className="rounded-lg bg-white px-6 py-3 font-mono text-sm font-bold text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+            disabled={loading || !strain.trim() || !location.trim()}
+            className="font-mono text-[11px] tracking-[1.4px] px-2.5 py-1 border rounded text-[#9DFFB5] border-[#9DFFB5] disabled:text-[#4F5354] disabled:border-[#22262A] disabled:opacity-60"
           >
-            {loading ? 'Searching...' : 'Find'}
+            {loading ? 'RUNNING…' : '↵ FIND · $0.02'}
           </button>
         </div>
         <input
@@ -99,16 +100,19 @@ export function StrainFinderSearch() {
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="City or address (US only)"
-          className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30 transition-colors"
+          className="w-full border border-[#22262A] bg-[#111315] rounded-md px-4 py-3 font-mono text-sm text-[#F1F1EE] placeholder-[#4F5354] outline-none focus:border-[#4F5354]"
           required
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-1">
+          <span className="font-mono text-[10px] text-[#4F5354] tracking-[1.4px] self-center mr-1.5">
+            OR TRY
+          </span>
           {exampleStrains.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setStrain(s)}
-              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-[11px] text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
+              className="px-3 py-1.5 border border-[#22262A] rounded-full text-xs text-[#8A8E8C] bg-[#111315] hover:text-[#F1F1EE] hover:border-[#4F5354]"
             >
               {s}
             </button>
@@ -117,111 +121,122 @@ export function StrainFinderSearch() {
       </form>
 
       {error && (
-        <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono">
+        <div className="mt-6 border border-[#FF7361]/30 bg-[#FF7361]/10 rounded-md px-4 py-3 text-sm text-[#FF7361] font-mono">
           {error}
         </div>
       )}
 
       {result && (
-        <div className="mt-8 space-y-6">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <p className="text-sm text-white/60 font-mono">{result.summary}</p>
-            <p className="mt-2 text-[11px] text-white/30 font-mono">
-              {result.location.resolved} | {result.dispensaries_searched} menus searched
+        <div className="mt-8 space-y-5">
+          <div className="border border-[#22262A] bg-[#111315] rounded-md p-4">
+            <p className="text-sm text-[#F1F1EE] font-mono">{result.summary}</p>
+            <p className="mt-2 text-[11px] text-[#4F5354] font-mono">
+              {result.location.resolved} · {result.dispensaries_searched} menus searched
             </p>
           </div>
 
           {result.results.length === 0 ? (
-            <p className="text-sm text-white/40 font-mono text-center py-8">
+            <p className="text-sm text-[#8A8E8C] font-mono text-center py-8">
               No dispensaries carry &quot;{result.strain}&quot; near this location. Try a different
               strain or expand your search area.
             </p>
           ) : (
-            result.results.map((disp, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden"
-              >
-                <div className="p-4 border-b border-white/5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <a
-                        href={disp.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base font-bold font-mono text-white hover:text-white/80 transition-colors"
-                      >
-                        {disp.dispensary}
-                      </a>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="text-[11px] font-mono text-yellow-400">
-                          {'*'.repeat(Math.round(disp.rating))} {disp.rating}
-                        </span>
-                        <span className="text-[11px] font-mono text-white/30">
-                          ({disp.reviews} reviews)
-                        </span>
-                      </div>
-                      {disp.address && (
-                        <p className="text-[11px] text-white/25 font-mono mt-1">
-                          {disp.address}, {disp.city}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-[11px] font-mono text-green-400 shrink-0">
-                      {disp.matches.length} match{disp.matches.length !== 1 ? 'es' : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-white/5">
-                  {disp.matches.map((match, j) => (
-                    <div key={j} className="p-4 hover:bg-white/[0.02] transition-colors">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-mono font-bold text-white/90 leading-snug">
-                            {match.name}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 text-white/40">
-                              {match.category}
+            result.results.map((disp, i) => {
+              const best = i === 0;
+              return (
+                <div
+                  key={i}
+                  className="rounded-md overflow-hidden"
+                  style={{
+                    background: best ? '#142219' : '#111315',
+                    border: `1px solid ${best ? '#9DFFB555' : '#22262A'}`,
+                  }}
+                >
+                  <div className="p-4 border-b border-[#22262A]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-[11px] text-[#4F5354]">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                          <a
+                            href={disp.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-base font-semibold text-[#F1F1EE] hover:text-[#9DFFB5]"
+                          >
+                            {disp.dispensary}
+                          </a>
+                          {best && (
+                            <span className="font-mono text-[9px] tracking-[1.4px] text-[#9DFFB5]">
+                              ★ BEST PRICE
                             </span>
-                            {match.genetics && match.genetics !== 'unknown' && (
-                              <span
-                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${geneticsColor[match.genetics] || 'border-white/10 text-white/40'}`}
-                              >
-                                {match.genetics}
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5 ml-7">
+                          <span className="text-[11px] font-mono text-[#FFB976]">
+                            ★ {disp.rating}
+                          </span>
+                          <span className="text-[11px] font-mono text-[#4F5354]">
+                            ({disp.reviews} reviews)
+                          </span>
+                          {disp.address && (
+                            <span className="text-[11px] text-[#8A8E8C] font-mono">
+                              · {disp.address}, {disp.city}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono text-[#9DFFB5] shrink-0">
+                        {disp.matches.length} match{disp.matches.length !== 1 ? 'es' : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="divide-y divide-[#22262A]">
+                    {disp.matches.map((match, j) => (
+                      <div key={j} className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-[#F1F1EE] leading-snug">
+                              {match.name}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#22262A] text-[#8A8E8C]">
+                                {match.category}
+                              </span>
+                              {match.genetics && match.genetics !== 'unknown' && (
+                                <span
+                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${geneticsColor[match.genetics] || 'border-[#22262A] text-[#8A8E8C]'}`}
+                                >
+                                  {match.genetics}
+                                </span>
+                              )}
+                              <span className="text-[11px] font-mono text-[#8A8E8C]">
+                                {match.brand}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            {match.price > 0 && (
+                              <span className="font-mono text-base font-bold text-[#9DFFB5] tabular-nums">
+                                ${match.price}
                               </span>
                             )}
-                            <span className="text-[11px] font-mono text-white/30">
-                              {match.brand}
-                            </span>
+                            {match.orderable && (
+                              <p className="text-[10px] font-mono text-[#4F5354] mt-0.5">
+                                Order online
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          {match.price > 0 && (
-                            <span className="text-sm font-mono font-bold text-green-400">
-                              ${match.price}
-                            </span>
-                          )}
-                          {match.orderable && (
-                            <p className="text-[10px] font-mono text-white/30 mt-0.5">
-                              Order online
-                            </p>
-                          )}
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
-
-          <div className="rounded-lg border border-white/5 bg-white/[0.01] p-4 text-center">
-            <p className="text-[11px] text-white/25 font-mono">
-              Powered by cannastack. Full API: $0.02/req via x402.
-            </p>
-          </div>
         </div>
       )}
     </div>
