@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
           WHERE mi.name ILIKE ${'%' + strain + '%'}
+            AND mi.available = true
             AND mi.dispensary_id = ANY(${dispIds})
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
           WHERE mi.name ILIKE ${'%' + strain + '%'}
+            AND mi.available = true
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
           LIMIT 500
@@ -123,6 +125,7 @@ export async function POST(req: NextRequest) {
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
           WHERE d.name ILIKE ${'%' + dispensaryName + '%'}
+            AND mi.available = true
             AND LOWER(mi.category) = ${category}
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
@@ -136,6 +139,7 @@ export async function POST(req: NextRequest) {
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
           WHERE d.name ILIKE ${'%' + dispensaryName + '%'}
+            AND mi.available = true
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
           LIMIT 500

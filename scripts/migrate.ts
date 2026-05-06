@@ -61,6 +61,7 @@ async function migrate() {
       dispensary_id INTEGER REFERENCES dispensaries(id) ON DELETE CASCADE,
       source TEXT NOT NULL,
       source_item_id TEXT,
+      source_item_key TEXT,
       name TEXT NOT NULL,
       category TEXT,
       brand TEXT,
@@ -75,9 +76,74 @@ async function migrate() {
       price_quarter NUMERIC(10,2),
       price_half_ounce NUMERIC(10,2),
       price_ounce NUMERIC(10,2),
+      available BOOLEAN DEFAULT true,
       orderable BOOLEAN DEFAULT false,
+      source_content_hash TEXT,
+      last_seen_run_id INTEGER,
+      raw_payload JSONB,
       crawled_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(dispensary_id, source, name, brand)
+    )
+  `;
+
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true`;
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS source_item_key TEXT`;
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS source_content_hash TEXT`;
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS last_seen_run_id INTEGER`;
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS raw_payload JSONB`;
+  await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
+
+  // Durable ETL run state
+  await sql`
+    CREATE TABLE IF NOT EXISTS crawl_runs (
+      id SERIAL PRIMARY KEY,
+      metro_id INTEGER REFERENCES metros(id),
+      source TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      stage TEXT NOT NULL DEFAULT 'setup',
+      dispensaries_found INTEGER DEFAULT 0,
+      items_extracted INTEGER DEFAULT 0,
+      items_loaded INTEGER DEFAULT 0,
+      items_new INTEGER DEFAULT 0,
+      items_updated INTEGER DEFAULT 0,
+      items_skipped INTEGER DEFAULT 0,
+      items_stale INTEGER DEFAULT 0,
+      warnings_count INTEGER DEFAULT 0,
+      errors_count INTEGER DEFAULT 0,
+      error_message TEXT,
+      started_at TIMESTAMPTZ DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    )
+  `;
+
+  // Per-item audit trail for extract/transform/load failures and idempotent loads
+  await sql`
+    CREATE TABLE IF NOT EXISTS crawl_item_events (
+      id SERIAL PRIMARY KEY,
+      crawl_run_id INTEGER REFERENCES crawl_runs(id) ON DELETE CASCADE,
+      source TEXT NOT NULL,
+      source_dispensary_id TEXT,
+      source_item_key TEXT,
+      menu_item_id INTEGER REFERENCES menu_items(id) ON DELETE SET NULL,
+      status TEXT NOT NULL,
+      error_message TEXT,
+      raw_payload JSONB,
+      transformed_payload JSONB,
+      content_hash TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS crawl_warnings (
+      id SERIAL PRIMARY KEY,
+      crawl_run_id INTEGER REFERENCES crawl_runs(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      source_id TEXT,
+      item_name TEXT,
+      message TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -129,11 +195,18 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS idx_dispensaries_source ON dispensaries(source, source_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_dispensaries_city ON dispensaries(city, state)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_dispensary ON menu_items(dispensary_id)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_items_source_key ON menu_items(dispensary_id, source, source_item_key)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_genetics ON menu_items(genetics)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_seen_run ON menu_items(last_seen_run_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_available ON menu_items(available)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_menu_items_name_trgm ON menu_items USING gin (name gin_trgm_ops)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_price_history_item ON price_history(menu_item_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_crawl_log_metro ON crawl_log(metro_id, started_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_crawl_runs_status ON crawl_runs(status, started_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_crawl_runs_metro_source ON crawl_runs(metro_id, source, started_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_crawl_item_events_run ON crawl_item_events(crawl_run_id, status)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_crawl_warnings_run ON crawl_warnings(crawl_run_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_request_log_endpoint ON request_log(endpoint, created_at)`;
 
   console.log('Migrations complete.');

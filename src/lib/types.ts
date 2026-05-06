@@ -40,6 +40,22 @@ export interface DataSourceAdapter {
   fetchMenu(sourceId: string): Promise<RawMenuItem[]>;
 }
 
+export interface ExtractedDispensary {
+  dispensary: RawDispensary;
+  menuItems: RawMenuItem[];
+}
+
+export type CrawlRunStatus = 'running' | 'success' | 'failed';
+
+export type CrawlRunStage = 'setup' | 'extract' | 'transform' | 'load' | 'cleanup';
+
+export interface CrawlWarning {
+  stage: CrawlRunStage;
+  message: string;
+  sourceId?: string;
+  itemName?: string;
+}
+
 export interface Metro {
   id: number;
   name: string;
@@ -50,12 +66,17 @@ export interface Metro {
 }
 
 export interface CrawlResult {
+  runId?: number;
   metroId: number;
   source: string;
+  status?: CrawlRunStatus;
   dispensariesFound: number;
   itemsCrawled: number;
   itemsNew: number;
   itemsUpdated: number;
+  itemsSkipped?: number;
+  itemsStale?: number;
   errors: number;
+  warningCount?: number;
   durationMs: number;
 }
