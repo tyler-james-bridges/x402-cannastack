@@ -46,6 +46,7 @@ export async function searchStrainInDB(
     FROM menu_items mi
     JOIN dispensaries d ON d.id = mi.dispensary_id
     WHERE mi.dispensary_id = ANY(${dispensaryIds})
+      AND mi.available = true
       AND mi.name ILIKE ${'%' + strain + '%'}
     ORDER BY mi.price_eighth ASC NULLS LAST, mi.price_unit ASC NULLS LAST
   `;
@@ -70,6 +71,7 @@ export async function searchCategoryInDB(
       FROM menu_items mi
       JOIN dispensaries d ON d.id = mi.dispensary_id
       WHERE mi.dispensary_id = ANY(${dispensaryIds})
+        AND mi.available = true
         AND LOWER(mi.category) = ANY(${categories.map((c) => c.toLowerCase())})
         AND LOWER(mi.genetics) = ${genetics.toLowerCase()}
       ORDER BY mi.price_unit ASC NULLS LAST, mi.price_eighth ASC NULLS LAST
@@ -86,6 +88,7 @@ export async function searchCategoryInDB(
     FROM menu_items mi
     JOIN dispensaries d ON d.id = mi.dispensary_id
     WHERE mi.dispensary_id = ANY(${dispensaryIds})
+      AND mi.available = true
       AND LOWER(mi.category) = ANY(${categories.map((c) => c.toLowerCase())})
     ORDER BY mi.price_unit ASC NULLS LAST, mi.price_eighth ASC NULLS LAST
     LIMIT ${limit}
@@ -118,6 +121,7 @@ export async function searchDealsInDB(
              mi.price_unit, mi.price_eighth, mi.orderable, mi.dispensary_id
       FROM menu_items mi
       WHERE mi.dispensary_id = ANY(${dealIds})
+        AND mi.available = true
         AND LOWER(mi.category) = ANY(${category.split(',').map((c) => c.trim().toLowerCase())})
       ORDER BY mi.price_unit ASC NULLS LAST
     `;
@@ -127,6 +131,7 @@ export async function searchDealsInDB(
              mi.price_unit, mi.price_eighth, mi.orderable, mi.dispensary_id
       FROM menu_items mi
       WHERE mi.dispensary_id = ANY(${dealIds})
+        AND mi.available = true
       ORDER BY mi.price_unit ASC NULLS LAST
     `;
   }

@@ -22,6 +22,7 @@ interface WmListing {
 }
 
 interface WmMenuItem {
+  id?: number | string;
   attributes: {
     name: string;
     category_name: string;
@@ -95,6 +96,7 @@ export class WeedmapsAdapter implements DataSourceAdapter {
             !EXCLUDED_CATEGORIES.includes(i.attributes.category_name?.toLowerCase() ?? ''),
         )
         .map((i) => ({
+          sourceItemId: i.id ? String(i.id) : undefined,
           name: i.attributes.name,
           category: i.attributes.category_name,
           brand: i.attributes.brand_name || undefined,
