@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchStrainInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchStrain } from '@/lib/fallback';
+import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+
+export const OPTIONS = preflight;
 
 function bestPrice(row: Record<string, unknown>): number {
   if (Number(row.price_unit) > 0) return Number(row.price_unit);
@@ -24,10 +27,10 @@ export async function POST(req: NextRequest) {
     const location = body.location?.trim();
 
     if (!strain) {
-      return NextResponse.json({ ok: false, error: "Missing 'strain'" }, { status: 400 });
+      return badRequest("Missing required parameter 'strain'", 'strain-finder');
     }
     if (!location) {
-      return NextResponse.json({ ok: false, error: "Missing 'location'" }, { status: 400 });
+      return badRequest("Missing required parameter 'location'", 'strain-finder');
     }
 
     const radiusMi = parseInt(body.radius || '15', 10) || 15;
@@ -37,15 +40,16 @@ export async function POST(req: NextRequest) {
     const cacheKey = `strain-finder:${sortedParams}`;
     const cached = getCached<Record<string, unknown>>(cacheKey);
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+      const responseMs = Date.now() - startMs;
+      return ok(
+        { ...cached, cached: true, response_ms: responseMs },
+        { endpoint: 'strain-finder', cache: 'hit', source: 'cache', responseMs },
+      );
     }
 
     const geo = await geocode(location);
     if (!geo) {
-      return NextResponse.json(
-        { ok: false, error: `Could not geocode: ${location}` },
-        { status: 400 },
-      );
+      return badRequest(`Could not geocode location: "${location}". Use a US city, address, or "City, ST".`, 'strain-finder');
     }
 
     const sql = getDb();
@@ -64,17 +68,20 @@ export async function POST(req: NextRequest) {
       dispCount = fallback.dispensaries.length;
 
       if (dispCount === 0) {
-        const responseData = {
-          ok: true,
-          strain,
-          location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
-          source,
-          dispensaries_searched: 0,
-          results: [],
-          summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
-          response_ms: Date.now() - startMs,
-        };
-        return NextResponse.json(responseData);
+        const responseMs = Date.now() - startMs;
+        return ok(
+          {
+            ok: true,
+            strain,
+            location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
+            source,
+            dispensaries_searched: 0,
+            results: [],
+            summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+            response_ms: responseMs,
+          },
+          { endpoint: 'strain-finder', source: 'live', cache: 'miss', responseMs },
+        );
       }
 
       matches = fallback.items as unknown as Record<string, unknown>[];
@@ -180,9 +187,9 @@ export async function POST(req: NextRequest) {
     };
 
     setCache(cacheKey, responseData);
-    return NextResponse.json(responseData);
+    return ok(responseData, { endpoint: 'strain-finder', source, cache: 'miss', responseMs });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return serverError(message, 'strain-finder');
   }
 }

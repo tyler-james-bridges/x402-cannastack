@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchDealsInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchDeals } from '@/lib/fallback';
+import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+
+export const OPTIONS = preflight;
 
 const CATEGORY_MAP: Record<string, string> = {
   flower: 'flower',
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
     const location = body.location?.trim();
 
     if (!location) {
-      return NextResponse.json({ ok: false, error: "Missing 'location'" }, { status: 400 });
+      return badRequest("Missing required parameter 'location'", 'deal-scout');
     }
 
     const categoryInput = body.category?.trim().toLowerCase() ?? null;
@@ -49,12 +52,9 @@ export async function POST(req: NextRequest) {
     if (categoryInput) {
       targetCategory = CATEGORY_MAP[categoryInput] ?? null;
       if (!targetCategory) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Unknown category: ${categoryInput}. Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
-          },
-          { status: 400 },
+        return badRequest(
+          `Unknown category: "${categoryInput}". Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
+          'deal-scout',
         );
       }
     }
@@ -68,15 +68,16 @@ export async function POST(req: NextRequest) {
     const cacheKey = `deal-scout:${sortedParams}`;
     const cached = getCached<Record<string, unknown>>(cacheKey);
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+      const responseMs = Date.now() - startMs;
+      return ok(
+        { ...cached, cached: true, response_ms: responseMs },
+        { endpoint: 'deal-scout', cache: 'hit', source: 'cache', responseMs },
+      );
     }
 
     const geo = await geocode(location);
     if (!geo) {
-      return NextResponse.json(
-        { ok: false, error: `Could not geocode: ${location}` },
-        { status: 400 },
-      );
+      return badRequest(`Could not geocode location: "${location}". Use a US city, address, or "City, ST".`, 'deal-scout');
     }
 
     const sql = getDb();
@@ -90,23 +91,21 @@ export async function POST(req: NextRequest) {
       const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategory, radiusMi);
 
       if (fallback.dispensaries.length === 0) {
-        const responseData = {
-          ok: true,
-          location: {
-            query: location,
-            lat: geo.lat,
-            lng: geo.lng,
-            resolved: geo.display_name,
+        const responseMs = Date.now() - startMs;
+        return ok(
+          {
+            ok: true,
+            location: { query: location, lat: geo.lat, lng: geo.lng, resolved: geo.display_name },
+            source,
+            category: categoryInput || 'all',
+            total_dispensaries: 0,
+            deals_dispensaries: 0,
+            results: [],
+            summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+            response_ms: responseMs,
           },
-          source,
-          category: categoryInput || 'all',
-          total_dispensaries: 0,
-          deals_dispensaries: 0,
-          results: [],
-          summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
-          response_ms: Date.now() - startMs,
-        };
-        return NextResponse.json(responseData);
+          { endpoint: 'deal-scout', source: 'live', cache: 'miss', responseMs },
+        );
       }
 
       const results = fallback.dealDisps.map((disp) => {
@@ -169,7 +168,7 @@ export async function POST(req: NextRequest) {
       };
 
       setCache(cacheKey, responseData);
-      return NextResponse.json(responseData);
+      return ok(responseData, { endpoint: 'deal-scout', source: 'live', cache: 'miss', responseMs });
     }
 
     // DB path (existing logic)
@@ -243,9 +242,9 @@ export async function POST(req: NextRequest) {
     };
 
     setCache(cacheKey, responseData);
-    return NextResponse.json(responseData);
+    return ok(responseData, { endpoint: 'deal-scout', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return serverError(message, 'deal-scout');
   }
 }

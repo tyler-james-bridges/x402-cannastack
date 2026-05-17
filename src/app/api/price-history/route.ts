@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
+import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+
+export const OPTIONS = preflight;
 
 interface PricePoint {
   item_name: string;
@@ -38,10 +41,7 @@ export async function POST(req: NextRequest) {
     const days = Math.min(Math.max(parseInt(body.days || '30', 10) || 30, 1), 365);
 
     if (!strain && !dispensaryName) {
-      return NextResponse.json(
-        { ok: false, error: "Provide either 'strain' or 'dispensary'" },
-        { status: 400 },
-      );
+      return badRequest("Provide either 'strain' or 'dispensary'", 'price-history');
     }
 
     // Check cache
@@ -49,7 +49,11 @@ export async function POST(req: NextRequest) {
     const cacheKey = `price-history:${sortedParams}`;
     const cached = getCached<Record<string, unknown>>(cacheKey);
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+      const responseMs = Date.now() - startMs;
+      return ok(
+        { ...cached, cached: true, response_ms: responseMs },
+        { endpoint: 'price-history', cache: 'hit', source: 'cache', responseMs },
+      );
     }
 
     const sql = getDb();
@@ -60,9 +64,9 @@ export async function POST(req: NextRequest) {
     if (location) {
       const geo = await geocode(location);
       if (!geo) {
-        return NextResponse.json(
-          { ok: false, error: `Could not geocode: ${location}` },
-          { status: 400 },
+        return badRequest(
+          `Could not geocode location: "${location}". Use a US city, address, or "City, ST".`,
+          'price-history',
         );
       }
       geoLat = geo.lat;
@@ -70,16 +74,19 @@ export async function POST(req: NextRequest) {
 
       const dispensaries = await findNearbyDispensaries(sql, geo.lat, geo.lng, 15);
       if (dispensaries.length === 0) {
-        const responseData = {
-          ok: true,
-          query: { strain, dispensary: dispensaryName, category, days, location },
-          source: 'database',
-          history: [],
-          stats: null,
-          summary: `No dispensaries found near ${location}. This area may not be crawled yet.`,
-          response_ms: Date.now() - startMs,
-        };
-        return NextResponse.json(responseData);
+        const responseMs = Date.now() - startMs;
+        return ok(
+          {
+            ok: true,
+            query: { strain, dispensary: dispensaryName, category, days, location },
+            source: 'database',
+            history: [],
+            stats: null,
+            summary: `No dispensaries found near ${location}. This area may not be crawled yet.`,
+            response_ms: responseMs,
+          },
+          { endpoint: 'price-history', source: 'database', cache: 'miss', responseMs },
+        );
       }
       dispIds = dispensaries.map((d) => d.id as number);
     }
@@ -198,9 +205,9 @@ export async function POST(req: NextRequest) {
     };
 
     setCache(cacheKey, responseData);
-    return NextResponse.json(responseData);
+    return ok(responseData, { endpoint: 'price-history', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return serverError(message, 'price-history');
   }
 }

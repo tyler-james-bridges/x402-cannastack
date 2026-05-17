@@ -23,7 +23,7 @@ export default function Home() {
         <LiveMeter variant="strip" className="ml-auto" />
         <span className="text-[#4F5354] hidden md:inline">│</span>
         <a href="/docs" className="hidden md:inline hover:text-[#9DFFB5]">docs</a>
-        <a href="https://github.com" className="hidden md:inline hover:text-[#9DFFB5]">github</a>
+        <a href="https://github.com/tyler-james-bridges/x402-cannastack" className="hidden md:inline hover:text-[#9DFFB5]">github</a>
       </div>
 
       {/* HERO — prompt + live response */}

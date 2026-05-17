@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { apiHeaders, preflight } from '@/lib/api-response';
+
+export const OPTIONS = preflight;
 
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'DATABASE_URL not configured' },
+      { status: 500, headers: apiHeaders() },
+    );
   }
 
   const sql = neon(databaseUrl);
@@ -29,10 +35,8 @@ export async function GET() {
     `,
   ]);
 
-  return NextResponse.json({
-    ok: true,
-    metros,
-    stats: stats[0],
-    recentCrawls,
-  });
+  return NextResponse.json(
+    { ok: true, metros, stats: stats[0], recentCrawls },
+    { headers: apiHeaders() },
+  );
 }
