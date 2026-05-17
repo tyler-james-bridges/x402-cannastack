@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata = {
-  title: 'Status · cannastack',
+  title: 'Status',
   description: 'Live system status, crawler health, and request volume for cannastack.',
 };
 

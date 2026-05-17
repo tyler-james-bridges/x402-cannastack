@@ -2,7 +2,7 @@ import { PageShell } from '@/components/home/page-shell';
 import { ENDPOINTS, type EndpointSpec } from '@/lib/endpoints';
 
 export const metadata = {
-  title: 'Docs · cannastack',
+  title: 'Docs',
   description:
     'API documentation for cannastack. Cannabis menus, prices, deals, and strain availability. $0.02 per call via x402.',
 };

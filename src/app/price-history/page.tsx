@@ -2,7 +2,7 @@ import { PageShell } from '@/components/home/page-shell';
 import { PriceHistorySearch } from '@/components/price-history-search';
 
 export const metadata = {
-  title: 'Price History · cannastack',
+  title: 'Price History',
   description:
     'Track cannabis price changes over time by strain or dispensary. Spot trends and the best time to buy.',
 };
