@@ -5,6 +5,7 @@ import { findNearbyDispensaries } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
 
@@ -30,7 +31,7 @@ function getTrend(prices: number[]): 'up' | 'down' | 'stable' {
   return 'stable';
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -211,3 +212,5 @@ export async function POST(req: NextRequest) {
     return serverError(message, 'price-history');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack price-history: Historical price trends for a category in range.');

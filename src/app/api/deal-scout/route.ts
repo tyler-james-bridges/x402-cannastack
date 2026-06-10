@@ -6,6 +6,7 @@ import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchDeals } from '@/lib/fallback';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
 
@@ -35,7 +36,7 @@ function bestPrice(row: Record<string, unknown>): number {
   return 0;
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -248,3 +249,5 @@ export async function POST(req: NextRequest) {
     return serverError(message, 'deal-scout');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack deal-scout: Find the best active cannabis deals in range.');

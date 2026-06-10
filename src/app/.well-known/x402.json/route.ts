@@ -15,9 +15,14 @@ export async function GET() {
     llms_txt: `${BASE}/llms.txt`,
     payment: {
       protocol: 'x402',
+      version: 2,
+      scheme: 'exact',
+      network: 'eip155:2741',
+      chain: 'abstract',
       asset: 'USDC',
+      asset_address: '0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1',
       settlement: 'per-request',
-      gateway: 'https://x402.bankr.bot',
+      facilitator: 'https://facilitator.x402.abs.xyz',
     },
     endpoints: ENDPOINTS.map((ep) => ({
       name: ep.name,

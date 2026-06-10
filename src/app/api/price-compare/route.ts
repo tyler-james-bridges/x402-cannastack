@@ -6,6 +6,7 @@ import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchCategory } from '@/lib/fallback';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
 
@@ -46,7 +47,7 @@ function bestPrice(row: Record<string, unknown>): { price: number; unit: string 
   return { price: 0, unit: 'unknown' };
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -194,3 +195,5 @@ export async function POST(req: NextRequest) {
     return serverError(message, 'price-compare');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack price-compare: Compare category prices across every dispensary in range.');
