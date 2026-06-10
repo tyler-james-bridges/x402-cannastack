@@ -21,7 +21,7 @@ The enterprise cannabis data market starts at $500/month. We're building the sam
 ```
 Vercel Cron (every 6h)
        |
-   Crawler
+   ETL Crawler
        |
   +----+----+
   |         |
@@ -39,6 +39,12 @@ Weedmaps  Leafly (planned)
 **Data sources:** Weedmaps public API (live), Leafly (planned), more TBD.
 
 **Stack:** Next.js, Neon Postgres, Vercel, Tailwind, x402/Bankr Cloud.
+
+The crawler now follows a staged ETL shape: setup, extract, transform, load, and
+cleanup. Each run is recorded in `crawl_runs`, per-item load/validation outcomes
+are written to `crawl_item_events`, and stale items from completed dispensary
+crawls are marked unavailable instead of silently lingering in search results.
+See [docs/etl-ingestion.md](docs/etl-ingestion.md).
 
 ## Development
 

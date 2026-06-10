@@ -50,7 +50,10 @@ export async function GET(req: NextRequest) {
         itemsCrawled: 0,
         itemsNew: 0,
         itemsUpdated: 0,
+        itemsSkipped: 0,
+        itemsStale: 0,
         errors: 1,
+        warningCount: 1,
         durationMs: 0,
       });
     }
@@ -76,6 +79,8 @@ export async function GET(req: NextRequest) {
 
   const totalItems = results.reduce((s, r) => s + r.itemsCrawled, 0);
   const totalNew = results.reduce((s, r) => s + r.itemsNew, 0);
+  const totalStale = results.reduce((s, r) => s + (r.itemsStale ?? 0), 0);
+  const totalWarnings = results.reduce((s, r) => s + (r.warningCount ?? 0), 0);
   const totalErrors = results.reduce((s, r) => s + r.errors, 0);
 
   return NextResponse.json({
@@ -83,6 +88,8 @@ export async function GET(req: NextRequest) {
     metros: metros.length,
     totalItems,
     totalNew,
+    totalStale,
+    totalWarnings,
     totalErrors,
     results,
   });
