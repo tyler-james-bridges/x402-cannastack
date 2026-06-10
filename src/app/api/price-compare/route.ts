@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries, searchCategoryInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchCategory } from '@/lib/fallback';
+import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { withPayment } from '@/lib/x402';
+
+export const OPTIONS = preflight;
 
 const CATEGORY_MAP: Record<string, string[]> = {
   flower: ['flower'],
@@ -43,7 +47,7 @@ function bestPrice(row: Record<string, unknown>): { price: number; unit: string 
   return { price: 0, unit: 'unknown' };
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -51,27 +55,20 @@ export async function POST(req: NextRequest) {
     const location = body.location?.trim();
 
     if (!categoryInput) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Missing 'category'. Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness",
-        },
-        { status: 400 },
+      return badRequest(
+        "Missing required parameter 'category'. Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness",
+        'price-compare',
       );
     }
     if (!location) {
-      return NextResponse.json({ ok: false, error: "Missing 'location'" }, { status: 400 });
+      return badRequest("Missing required parameter 'location'", 'price-compare');
     }
 
     const targetCategories = CATEGORY_MAP[categoryInput];
     if (!targetCategories) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Unknown category: ${categoryInput}. Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
-        },
-        { status: 400 },
+      return badRequest(
+        `Unknown category: "${categoryInput}". Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
+        'price-compare',
       );
     }
 
@@ -90,15 +87,16 @@ export async function POST(req: NextRequest) {
     const cacheKey = `price-compare:${sortedParams}`;
     const cached = getCached<Record<string, unknown>>(cacheKey);
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true, response_ms: Date.now() - startMs });
+      const responseMs = Date.now() - startMs;
+      return ok(
+        { ...cached, cached: true, response_ms: responseMs },
+        { endpoint: 'price-compare', cache: 'hit', source: 'cache', responseMs },
+      );
     }
 
     const geo = await geocode(location);
     if (!geo) {
-      return NextResponse.json(
-        { ok: false, error: `Could not geocode: ${location}` },
-        { status: 400 },
-      );
+      return badRequest(`Could not geocode location: "${location}". Use a US city, address, or "City, ST".`, 'price-compare');
     }
 
     const sql = getDb();
@@ -191,9 +189,11 @@ export async function POST(req: NextRequest) {
     };
 
     setCache(cacheKey, responseData);
-    return NextResponse.json(responseData);
+    return ok(responseData, { endpoint: 'price-compare', source, cache: 'miss', responseMs });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return serverError(message, 'price-compare');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack price-compare: Compare category prices across every dispensary in range.');

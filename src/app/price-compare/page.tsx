@@ -2,7 +2,7 @@ import { PageShell } from '@/components/home/page-shell';
 import { PriceCompareSearch } from '@/components/price-compare-search';
 
 export const metadata = {
-  title: 'Price Compare · cannastack',
+  title: 'Price Compare',
   description:
     'Compare cannabis prices across nearby dispensaries. Filter by category and genetics.',
 };

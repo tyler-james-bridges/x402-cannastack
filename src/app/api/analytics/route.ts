@@ -5,6 +5,9 @@
 
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { apiHeaders, preflight } from '@/lib/api-response';
+
+export const OPTIONS = preflight;
 
 // Endpoint pricing — keep in sync with your x402 config.
 const PRICE_USDC: Record<string, number> = {
@@ -44,21 +47,24 @@ export async function GET() {
       0,
     );
 
-    return NextResponse.json({
-      ok: true,
-      total_requests: Number(total[0].cnt),
-      reqs_24h: (settled24h as Array<Record<string, unknown>>).reduce(
-        (s, r) => s + Number(r.cnt),
-        0,
-      ),
-      usdc_24h: Number(usdc24h.toFixed(2)),
-      by_endpoint: topEndpoints,
-      top_locations: topLocations,
-      top_strains: topStrains,
-      recent,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        total_requests: Number(total[0].cnt),
+        reqs_24h: (settled24h as Array<Record<string, unknown>>).reduce(
+          (s, r) => s + Number(r.cnt),
+          0,
+        ),
+        usdc_24h: Number(usdc24h.toFixed(2)),
+        by_endpoint: topEndpoints,
+        top_locations: topLocations,
+        top_strains: topStrains,
+        recent,
+      },
+      { headers: apiHeaders() },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500, headers: apiHeaders() });
   }
 }

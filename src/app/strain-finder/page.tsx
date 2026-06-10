@@ -2,7 +2,7 @@ import { PageShell } from '@/components/home/page-shell';
 import { StrainFinderSearch } from '@/components/strain-finder-search';
 
 export const metadata = {
-  title: 'Strain Finder · cannastack',
+  title: 'Strain Finder',
   description:
     'Find which dispensaries near you carry a specific strain. Cross-dispensary search sorted by price.',
 };

@@ -2,7 +2,7 @@ import { PageShell } from '@/components/home/page-shell';
 import { DealScoutSearch } from '@/components/deal-scout-search';
 
 export const metadata = {
-  title: 'Deal Scout · cannastack',
+  title: 'Deal Scout',
   description: 'Find dispensaries with active deals near you. Filter by category.',
 };
 
