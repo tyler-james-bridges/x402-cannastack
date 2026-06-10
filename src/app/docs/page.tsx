@@ -92,16 +92,18 @@ export default function DocsPage() {
       <section className="pb-6 max-w-[900px]">
         <h2 className="text-xl font-semibold tracking-tight">Quick start</h2>
         <p className="text-sm text-[#8A8E8C] mt-2 leading-relaxed">
-          Open access: every endpoint accepts plain JSON POST with no auth. For metered access via the
-          x402 micropayment protocol, route the call through a wallet-capable client (Bankr, AgentCash,
-          the x402 fetch shim). The exact same endpoint serves both — the gateway settles USDC before
-          forwarding the request.
+          Every endpoint is a single JSON POST. Without payment it returns HTTP 402 with payment
+          requirements; route the call through an x402-capable client (the x402 fetch shim, AgentCash,
+          or any wallet that speaks x402) to settle $0.02 in USDC on Abstract and receive the data.
+          The exact same URL serves both the 402 challenge and the 200 response.
         </p>
         <div className="mt-4">
-          <CodeBlock>{`# Free preview from any terminal
-curl -X POST ${BASE}/api/strain-finder \\
+          <CodeBlock>{`# Unpaid request returns HTTP 402 + payment requirements
+curl -i -X POST ${BASE}/api/strain-finder \\
   -H 'Content-Type: application/json' \\
-  -d '{"strain":"Blue Dream","location":"Denver, CO"}'`}</CodeBlock>
+  -d '{"strain":"Blue Dream","location":"Denver, CO"}'
+
+# Pay + retry automatically with an x402 client (settles USDC on Abstract)`}</CodeBlock>
         </div>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
