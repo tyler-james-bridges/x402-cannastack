@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { crawlMetro } from '@/lib/crawler';
@@ -9,14 +10,24 @@ import type { Metro, CrawlResult } from '@/lib/types';
 
 export const maxDuration = 300; // 5 min max for Vercel
 
+function authorized(req: NextRequest, cronSecret: string): boolean {
+  const auth = req.headers.get('authorization') ?? '';
+  const expected = Buffer.from(`Bearer ${cronSecret}`);
+  const provided = Buffer.from(auth);
+  return expected.length === provided.length && timingSafeEqual(expected, provided);
+}
+
 export async function GET(req: NextRequest) {
-  // Verify cron secret if set
+  // Crawls are expensive (5 min, hammers source APIs) — never run them unauthenticated.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  if (!cronSecret) {
+    return NextResponse.json(
+      { error: 'Crawl disabled: CRON_SECRET is not configured' },
+      { status: 503 },
+    );
+  }
+  if (!authorized(req, cronSecret)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const databaseUrl = process.env.DATABASE_URL;

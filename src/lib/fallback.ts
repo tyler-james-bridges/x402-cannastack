@@ -185,13 +185,13 @@ export async function fallbackSearchCategory(
     allItems.push(...matching);
   }
 
-  return { dispensaries, items: allItems.slice(0, limit) };
+  return { dispensaries: topDisps, items: allItems.slice(0, limit) };
 }
 
 export async function fallbackSearchDeals(
   lat: number,
   lng: number,
-  category: string | null,
+  categories: string[] | null,
   radiusMi: number = 15,
 ): Promise<{
   dispensaries: FallbackDispensary[];
@@ -207,9 +207,7 @@ export async function fallbackSearchDeals(
   const topDealDisps = dealDisps.slice(0, 10);
 
   const allItems: FallbackMenuItem[] = [];
-  const catParts = category
-    ? category.split(',').map((c) => c.trim().toLowerCase())
-    : null;
+  const catParts = categories ? categories.map((c) => c.toLowerCase()) : null;
 
   for (const disp of topDealDisps) {
     const rawItems = await adapter.fetchMenu(disp.source_id);

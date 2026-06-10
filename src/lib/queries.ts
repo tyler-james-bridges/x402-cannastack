@@ -1,10 +1,5 @@
 import type { NeonQueryFunction } from '@neondatabase/serverless';
-
-// Haversine distance in miles between two lat/lng points
-// Used as SQL expression for distance filtering
-export function haversineSQL(lat: number, lng: number) {
-  return `(3959 * acos(cos(radians(${lat})) * cos(radians(d.lat)) * cos(radians(d.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(d.lat))))`;
-}
+import { likePattern } from './validate';
 
 export async function findNearbyDispensaries(
   sql: NeonQueryFunction<false, false>,
@@ -47,7 +42,7 @@ export async function searchStrainInDB(
     JOIN dispensaries d ON d.id = mi.dispensary_id
     WHERE mi.dispensary_id = ANY(${dispensaryIds})
       AND mi.available = true
-      AND mi.name ILIKE ${'%' + strain + '%'}
+      AND mi.name ILIKE ${likePattern(strain)}
     ORDER BY mi.price_eighth ASC NULLS LAST, mi.price_unit ASC NULLS LAST
   `;
 }
@@ -98,7 +93,7 @@ export async function searchCategoryInDB(
 export async function searchDealsInDB(
   sql: NeonQueryFunction<false, false>,
   dispensaryIds: number[],
-  category: string | null,
+  categories: string[] | null,
 ) {
   if (dispensaryIds.length === 0) return { dealDisps: [], allCount: 0 };
 
@@ -115,14 +110,14 @@ export async function searchDealsInDB(
   const dealIds = dealDisps.map((d) => d.id as number);
 
   let items;
-  if (category) {
+  if (categories) {
     items = await sql`
       SELECT mi.name, mi.category, mi.brand, mi.genetics,
              mi.price_unit, mi.price_eighth, mi.orderable, mi.dispensary_id
       FROM menu_items mi
       WHERE mi.dispensary_id = ANY(${dealIds})
         AND mi.available = true
-        AND LOWER(mi.category) = ANY(${category.split(',').map((c) => c.trim().toLowerCase())})
+        AND LOWER(mi.category) = ANY(${categories.map((c) => c.toLowerCase())})
       ORDER BY mi.price_unit ASC NULLS LAST
     `;
   } else {

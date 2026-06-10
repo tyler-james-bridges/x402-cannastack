@@ -82,10 +82,14 @@ async function migrate() {
       last_seen_run_id INTEGER,
       raw_payload JSONB,
       crawled_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(dispensary_id, source, name, brand)
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // source_item_key (unique index below) is the canonical identity for upserts.
+  // The legacy (name, brand) constraint conflicts with ON CONFLICT (source_item_key)
+  // and makes inserts fail for distinct items sharing a name+brand.
+  await sql`ALTER TABLE menu_items DROP CONSTRAINT IF EXISTS menu_items_dispensary_id_source_name_brand_key`;
 
   await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available BOOLEAN DEFAULT true`;
   await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS source_item_key TEXT`;

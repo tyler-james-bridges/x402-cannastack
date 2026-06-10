@@ -6,19 +6,11 @@ import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchStrain } from '@/lib/fallback';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { bestPriceValue } from '@/lib/pricing';
+import { clampInt, MAX_QUERY_LENGTH, MAX_RADIUS_MI } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
-
-function bestPrice(row: Record<string, unknown>): number {
-  if (Number(row.price_unit) > 0) return Number(row.price_unit);
-  if (Number(row.price_eighth) > 0) return Number(row.price_eighth);
-  if (Number(row.price_gram) > 0) return Number(row.price_gram);
-  if (Number(row.price_quarter) > 0) return Number(row.price_quarter);
-  if (Number(row.price_half_ounce) > 0) return Number(row.price_half_ounce);
-  if (Number(row.price_ounce) > 0) return Number(row.price_ounce);
-  return 0;
-}
 
 async function handler(req: NextRequest) {
   const startMs = Date.now();
@@ -33,8 +25,11 @@ async function handler(req: NextRequest) {
     if (!location) {
       return badRequest("Missing required parameter 'location'", 'strain-finder');
     }
+    if (strain.length > MAX_QUERY_LENGTH) {
+      return badRequest(`'strain' must be at most ${MAX_QUERY_LENGTH} characters`, 'strain-finder');
+    }
 
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = clampInt(body.radius, 15, 1, MAX_RADIUS_MI);
 
     // Check cache
     const sortedParams = JSON.stringify({ location, radius: radiusMi, strain });
@@ -135,7 +130,7 @@ async function handler(req: NextRequest) {
         category: (row.category as string) || '',
         brand: (row.brand as string) || 'Unknown',
         genetics: (row.genetics as string) || 'unknown',
-        price: bestPrice(row),
+        price: bestPriceValue(row),
         orderable: row.orderable as boolean,
       });
     }

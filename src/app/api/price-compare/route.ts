@@ -6,46 +6,12 @@ import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchCategory } from '@/lib/fallback';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
+import { bestPrice } from '@/lib/pricing';
+import { clampInt, MAX_RADIUS_MI, MAX_RESULT_LIMIT } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
-
-const CATEGORY_MAP: Record<string, string[]> = {
-  flower: ['flower'],
-  edibles: ['edibles'],
-  edible: ['edibles'],
-  vape: ['vape pens'],
-  vapes: ['vape pens'],
-  'vape pens': ['vape pens'],
-  cartridge: ['vape pens'],
-  concentrate: ['concentrates'],
-  concentrates: ['concentrates'],
-  dab: ['concentrates'],
-  'pre-roll': ['pre-rolls', 'pre roll', 'infused pre roll'],
-  'pre-rolls': ['pre-rolls', 'pre roll', 'infused pre roll'],
-  preroll: ['pre-rolls', 'pre roll', 'infused pre roll'],
-  prerolls: ['pre-rolls', 'pre roll', 'infused pre roll'],
-  joint: ['pre-rolls', 'pre roll', 'infused pre roll'],
-  drink: ['drinks'],
-  drinks: ['drinks'],
-  beverage: ['drinks'],
-  tincture: ['tinctures'],
-  tinctures: ['tinctures'],
-  topical: ['topicals'],
-  topicals: ['topicals'],
-  wellness: ['wellness'],
-};
-
-function bestPrice(row: Record<string, unknown>): { price: number; unit: string } {
-  if (Number(row.price_unit) > 0) return { price: Number(row.price_unit), unit: 'unit' };
-  if (Number(row.price_eighth) > 0) return { price: Number(row.price_eighth), unit: 'eighth' };
-  if (Number(row.price_gram) > 0) return { price: Number(row.price_gram), unit: 'gram' };
-  if (Number(row.price_quarter) > 0) return { price: Number(row.price_quarter), unit: 'quarter' };
-  if (Number(row.price_half_ounce) > 0)
-    return { price: Number(row.price_half_ounce), unit: 'half_ounce' };
-  if (Number(row.price_ounce) > 0) return { price: Number(row.price_ounce), unit: 'ounce' };
-  return { price: 0, unit: 'unknown' };
-}
 
 async function handler(req: NextRequest) {
   const startMs = Date.now();
@@ -56,7 +22,7 @@ async function handler(req: NextRequest) {
 
     if (!categoryInput) {
       return badRequest(
-        "Missing required parameter 'category'. Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness",
+        `Missing required parameter 'category'. Options: ${CATEGORY_OPTIONS}`,
         'price-compare',
       );
     }
@@ -67,14 +33,14 @@ async function handler(req: NextRequest) {
     const targetCategories = CATEGORY_MAP[categoryInput];
     if (!targetCategories) {
       return badRequest(
-        `Unknown category: "${categoryInput}". Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
+        `Unknown category: "${categoryInput}". Options: ${CATEGORY_OPTIONS}`,
         'price-compare',
       );
     }
 
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = clampInt(body.radius, 15, 1, MAX_RADIUS_MI);
     const genetics = body.genetics?.trim().toLowerCase() || null;
-    const limit = Math.min(body.limit ?? 50, 100);
+    const limit = clampInt(body.limit, 50, 1, MAX_RESULT_LIMIT);
 
     // Check cache
     const sortedParams = JSON.stringify({

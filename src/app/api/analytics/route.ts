@@ -1,21 +1,9 @@
-// src/app/api/analytics/route.ts
-// Extends your existing analytics route with the two fields the homepage
-// meter + event stream need: settled USDC over the last 24h, and recent
-// requests with city coordinates so the map can pin them.
-
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { apiHeaders, preflight } from '@/lib/api-response';
+import { PRICE_USDC } from '@/lib/analytics-types';
 
 export const OPTIONS = preflight;
-
-// Endpoint pricing — keep in sync with your x402 config.
-const PRICE_USDC: Record<string, number> = {
-  'strain-finder': 0.02,
-  'price-compare': 0.02,
-  'deal-scout': 0.02,
-  'price-history': 0.02,
-};
 
 export async function GET() {
   try {
@@ -30,8 +18,8 @@ export async function GET() {
       sql`SELECT params->>'strain' as strain, count(*) as cnt
           FROM request_log WHERE endpoint = 'strain-finder' AND params->>'strain' IS NOT NULL
           GROUP BY params->>'strain' ORDER BY cnt DESC LIMIT 10`,
-      // recent feeds the event stream + map; include lat/lng if you've added the columns,
-      // otherwise the client falls back to a city dictionary.
+      // recent feeds the event stream + map; the client falls back to a city
+      // dictionary for rows logged before lat/lng were recorded.
       sql`SELECT endpoint, location_query, params, results_count, response_ms,
                  created_at, lat AS location_lat, lng AS location_lng
           FROM request_log

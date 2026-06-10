@@ -27,6 +27,12 @@ const DEFAULT_PAY_TO = (
 export const PREVIEW_MODE =
   process.env.X402_PREVIEW_MODE === '1' || process.env.X402_PREVIEW_MODE === 'true';
 
+if (PREVIEW_MODE) {
+  console.warn(
+    '[x402] X402_PREVIEW_MODE is on — all paid endpoints are served FREE. Unset it to restore metering.',
+  );
+}
+
 let _abstractServer: x402ResourceServer | null = null;
 
 function makeScheme() {

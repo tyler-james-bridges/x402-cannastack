@@ -136,9 +136,11 @@ export function HeroPrompt() {
 
   const parsed = parse(text);
 
-  async function run() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
     setLoading(true); setErr(null); setResponse(null);
+    // eslint-disable-next-line react-hooks/purity -- event handler, not render; rule loses handler context across await
     const start = Date.now();
     try {
       const res = await fetch(`/api/${parsed.endpoint}`, {
@@ -147,9 +149,10 @@ export function HeroPrompt() {
         body: JSON.stringify(parsed.params),
       });
       const data = await res.json();
+      // eslint-disable-next-line react-hooks/purity -- event handler, not render
       data._client_ms = Date.now() - start;
       setResponse(data);
-    } catch (e) {
+    } catch {
       setErr('Network error.');
     } finally {
       setLoading(false);
@@ -174,7 +177,7 @@ export function HeroPrompt() {
 
         {/* prompt input */}
         <form
-          onSubmit={(e) => { e.preventDefault(); run(); }}
+          onSubmit={handleSubmit}
           className="mt-6 border border-[#22262A] bg-[#111315] rounded-md flex items-center gap-3 px-5 py-4"
         >
           <span className="font-mono text-lg text-[#9DFFB5]">›</span>

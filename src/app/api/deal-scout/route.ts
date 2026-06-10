@@ -6,35 +6,12 @@ import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchDeals } from '@/lib/fallback';
 import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
+import { bestPriceValue } from '@/lib/pricing';
+import { clampInt, MAX_RADIUS_MI } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
 
 export const OPTIONS = preflight;
-
-const CATEGORY_MAP: Record<string, string> = {
-  flower: 'flower',
-  edibles: 'edibles',
-  edible: 'edibles',
-  vape: 'vape pens',
-  vapes: 'vape pens',
-  concentrate: 'concentrates',
-  concentrates: 'concentrates',
-  'pre-roll': 'pre-rolls,pre roll,infused pre roll',
-  'pre-rolls': 'pre-rolls,pre roll,infused pre roll',
-  preroll: 'pre-rolls,pre roll,infused pre roll',
-  drink: 'drinks',
-  drinks: 'drinks',
-  tincture: 'tinctures',
-  tinctures: 'tinctures',
-  topical: 'topicals',
-  topicals: 'topicals',
-  wellness: 'wellness',
-};
-
-function bestPrice(row: Record<string, unknown>): number {
-  if (Number(row.price_unit) > 0) return Number(row.price_unit);
-  if (Number(row.price_eighth) > 0) return Number(row.price_eighth);
-  return 0;
-}
 
 async function handler(req: NextRequest) {
   const startMs = Date.now();
@@ -47,14 +24,14 @@ async function handler(req: NextRequest) {
     }
 
     const categoryInput = body.category?.trim().toLowerCase() ?? null;
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = clampInt(body.radius, 15, 1, MAX_RADIUS_MI);
 
-    let targetCategory: string | null = null;
+    let targetCategories: string[] | null = null;
     if (categoryInput) {
-      targetCategory = CATEGORY_MAP[categoryInput] ?? null;
-      if (!targetCategory) {
+      targetCategories = CATEGORY_MAP[categoryInput] ?? null;
+      if (!targetCategories) {
         return badRequest(
-          `Unknown category: "${categoryInput}". Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
+          `Unknown category: "${categoryInput}". Options: ${CATEGORY_OPTIONS}`,
           'deal-scout',
         );
       }
@@ -89,7 +66,7 @@ async function handler(req: NextRequest) {
     if (dispensaries.length === 0) {
       // Fallback to live Weedmaps data
       source = 'live';
-      const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategory, radiusMi);
+      const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategories, radiusMi);
 
       if (fallback.dispensaries.length === 0) {
         const responseMs = Date.now() - startMs;
@@ -118,7 +95,7 @@ async function handler(req: NextRequest) {
             category: item.category || '',
             brand: item.brand || 'Unknown',
             genetics: item.genetics || 'unknown',
-            price: bestPrice(item as unknown as Record<string, unknown>),
+            price: bestPriceValue(item as unknown as Record<string, unknown>),
             orderable: item.orderable,
           }));
 
@@ -174,7 +151,7 @@ async function handler(req: NextRequest) {
 
     // DB path (existing logic)
     const dispIds = dispensaries.map((d) => d.id as number);
-    const { dealDisps, items, allCount } = await searchDealsInDB(sql, dispIds, targetCategory);
+    const { dealDisps, items, allCount } = await searchDealsInDB(sql, dispIds, targetCategories);
 
     const results = dealDisps.map((disp) => {
       const dispItems = (items || [])
@@ -185,7 +162,7 @@ async function handler(req: NextRequest) {
           category: (item.category as string) || '',
           brand: (item.brand as string) || 'Unknown',
           genetics: (item.genetics as string) || 'unknown',
-          price: bestPrice(item),
+          price: bestPriceValue(item),
           orderable: item.orderable as boolean,
         }));
 

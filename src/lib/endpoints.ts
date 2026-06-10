@@ -58,7 +58,7 @@ export const ENDPOINTS: EndpointSpec[] = [
       { name: 'category', type: 'string', required: true, description: 'flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness', example: 'flower' },
       { name: 'location', type: 'string', required: true, description: 'City, address, or "City, ST". US only.', example: 'Seattle, WA' },
       { name: 'genetics', type: 'string', required: false, description: 'Filter by genetics: sativa, indica, hybrid', example: 'sativa' },
-      { name: 'radius', type: 'number', required: false, description: 'Search radius in miles. Default 15.', example: 15 },
+      { name: 'radius', type: 'number', required: false, description: 'Search radius in miles. Default 15, max 50.', example: 15 },
       { name: 'limit', type: 'number', required: false, description: 'Max products to return. Default 50, max 100.', example: 50 },
     ],
     example_request: { category: 'flower', location: 'Seattle, WA', genetics: 'sativa', limit: 50 },
@@ -82,7 +82,7 @@ export const ENDPOINTS: EndpointSpec[] = [
     params: [
       { name: 'location', type: 'string', required: true, description: 'City, address, or "City, ST". US only.', example: 'Las Vegas, NV' },
       { name: 'category', type: 'string', required: false, description: 'Filter deals to one category (flower, vape, etc.)', example: 'flower' },
-      { name: 'radius', type: 'number', required: false, description: 'Search radius in miles. Default 15.', example: 15 },
+      { name: 'radius', type: 'number', required: false, description: 'Search radius in miles. Default 15, max 50.', example: 15 },
     ],
     example_request: { location: 'Las Vegas, NV', category: 'flower' },
     example_response: {

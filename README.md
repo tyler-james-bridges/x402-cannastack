@@ -6,15 +6,16 @@ Agent-native cannabis data platform. Dispensary menus, prices, deals, and strain
 
 The enterprise cannabis data market starts at $500/month. We're building the same data layer at $0.02/request with zero API keys, zero contracts, and instant access via the x402 payment protocol.
 
-**Live endpoints** on [Bankr Cloud](https://x402.bankr.bot):
+**Endpoints in this app** (served at [cannastack.0x402.sh](https://cannastack.0x402.sh), paid via x402 on Abstract):
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
-| `weedmaps-recs` | $0.03 | Dispensary finder + product recommendations |
-| `night-out` | $0.05 | Multi-source local planner (dispensaries + bars + restaurants + breweries) |
 | `strain-finder` | $0.02 | Cross-dispensary strain search |
 | `price-compare` | $0.02 | Category price comparison across dispensaries |
 | `deal-scout` | $0.02 | Find dispensaries with active deals |
+| `price-history` | $0.02 | Price trends over time for a strain or dispensary |
+
+Related endpoints hosted separately on [Bankr Cloud](https://x402.bankr.bot) (not part of this codebase): `weedmaps-recs` ($0.03) and `night-out` ($0.05).
 
 ## Architecture
 
@@ -23,11 +24,8 @@ Vercel Cron (every 6h)
        |
    ETL Crawler
        |
-  +----+----+
-  |         |
-Weedmaps  Leafly (planned)
-  |         |
-  +----+----+
+       |
+   Weedmaps
        |
   Neon Postgres
        |
@@ -36,7 +34,7 @@ Weedmaps  Leafly (planned)
  API  Web UI   Bankr
 ```
 
-**Data sources:** Weedmaps public API (live), Leafly (planned), more TBD.
+**Data sources:** Weedmaps public API (live). A Leafly adapter exists in `src/lib/adapters/leafly.ts` but is disabled in the crawl route until their public API access is confirmed.
 
 **Stack:** Next.js, Neon Postgres, Vercel, Tailwind, x402/Bankr Cloud.
 
@@ -55,7 +53,7 @@ npm run dev
 
 ## Web Preview
 
-Live at [cannastack.0x402.sh](https://cannastack.0x402.sh) (coming soon).
+Live at [cannastack.0x402.sh](https://cannastack.0x402.sh). Agent discovery surfaces: [/llms.txt](https://cannastack.0x402.sh/llms.txt), [/openapi.json](https://cannastack.0x402.sh/openapi.json), [/.well-known/x402.json](https://cannastack.0x402.sh/.well-known/x402.json).
 
 ## x402 API Usage
 
