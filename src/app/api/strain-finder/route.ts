@@ -9,6 +9,7 @@ import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { bestPriceValue } from '@/lib/pricing';
 import { clampInt, MAX_QUERY_LENGTH, MAX_RADIUS_MI } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
+import { nextForStrainFinder } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
@@ -74,6 +75,12 @@ async function handler(req: NextRequest) {
             dispensaries_searched: 0,
             results: [],
             summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+            next_actions: nextForStrainFinder({
+              strain,
+              location,
+              radius: radiusMi,
+              resultCount: 0,
+            }),
             response_ms: responseMs,
           },
           { endpoint: 'strain-finder', source: 'live', cache: 'miss', responseMs },
@@ -179,6 +186,13 @@ async function handler(req: NextRequest) {
       dispensaries_searched: dispCount,
       results,
       summary,
+      next_actions: nextForStrainFinder({
+        strain,
+        location,
+        radius: radiusMi,
+        resultCount: results.length,
+        topCategory: results[0]?.matches[0]?.category || undefined,
+      }),
       response_ms: responseMs,
     };
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useX402Fetch } from '@/lib/use-x402-fetch';
+import { NextActionChips, readPrefill, type NextAction } from '@/components/next-actions';
 
 interface PricePoint {
   item_name: string;
@@ -35,6 +36,7 @@ interface SearchResult {
   history: PricePoint[];
   stats: Stats | null;
   summary: string;
+  next_actions?: NextAction[];
 }
 
 const trendIndicator: Record<string, { arrow: string; color: string }> = {
@@ -67,6 +69,21 @@ export function PriceHistorySearch() {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
+
+  // Prefill from URL params so next_actions links land ready to run.
+  // Prefill only — running (and paying) stays a deliberate click.
+  // (Client-only URL read after mount is the documented hydration-safe
+  // pattern; the synchronous setState is intentional, hence the suppression.)
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const q = readPrefill(['strain', 'dispensary', 'category', 'location', 'days']);
+    if (q.strain) setStrain(q.strain);
+    if (q.dispensary) setDispensary(q.dispensary);
+    if (q.category) setCategory(q.category);
+    if (q.location) setLocation(q.location);
+    if (q.days) setDays(q.days);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -353,6 +370,7 @@ export function PriceHistorySearch() {
               </div>
             </div>
           )}
+          <NextActionChips actions={result.next_actions} />
         </div>
       )}
     </div>

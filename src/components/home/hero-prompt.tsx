@@ -66,7 +66,17 @@ function parse(text: string): Parsed | null {
   return null;
 }
 
-type Row = { title: string; subtitle?: string; price?: number };
+type Row = { title: string; subtitle?: string; price?: number; url?: string };
+
+// Shape of the next_actions block every paid endpoint now returns: a
+// ready-to-send follow-up call so neither agents nor humans dead-end here.
+type NextAction = {
+  action: string;
+  description: string;
+  endpoint: Parsed['endpoint'];
+  body: Record<string, unknown>;
+  price_usdc: number;
+};
 
 function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint']): Row[] {
   if (endpoint === 'strain-finder' && Array.isArray(resp.results)) {
@@ -77,6 +87,7 @@ function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint'
         title: (r.dispensary as string) || '—',
         subtitle: cheapest?.name || (r.address as string) || undefined,
         price: cheapest?.price,
+        url: (r.url as string) || undefined,
       };
     });
   }
@@ -95,6 +106,7 @@ function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint'
         title: (r.dispensary as string) || '—',
         subtitle: cheapest?.name || (r.address as string) || undefined,
         price: cheapest?.price,
+        url: (r.url as string) || undefined,
       };
     });
   }
@@ -172,16 +184,19 @@ export function HeroPrompt() {
   const [status, setStatus] = useState<RunStatus>('idle');
   const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [response, setResponse] = useState<Record<string, unknown> | null>(null);
+  // The request the current response (or in-flight call) belongs to — chips
+  // from next_actions run a different endpoint than the parsed input, so the
+  // panel renders from this, not from `parsed`.
+  const [active, setActive] = useState<{ endpoint: Parsed['endpoint']; cost: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   const parsed = parse(text);
   const loading = status === 'calling' || status === 'paying';
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
+  async function execute(endpoint: Parsed['endpoint'], params: Record<string, unknown>, cost: number) {
     setErr(null); setResponse(null); setHttpStatus(null);
+    setActive({ endpoint, cost });
     setStatus(ready && payFetch ? 'paying' : 'calling');
     // eslint-disable-next-line react-hooks/purity -- event handler, not render; rule loses handler context across await
     const start = Date.now();
@@ -189,21 +204,21 @@ export function HeroPrompt() {
       const init: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.params),
+        body: JSON.stringify(params),
       };
       // With a wallet ready on Base, payFetch transparently answers the 402:
-      // it signs the $0.02 USDC authorization in the wallet UI and retries.
+      // it signs the USDC authorization in the wallet UI and retries.
       // Without one, fall back to a plain fetch so the paywall is visible.
       const res = ready && payFetch
-        ? await payFetch(`/api/${parsed.endpoint}`, init)
-        : await fetch(`/api/${parsed.endpoint}`, init);
+        ? await payFetch(`/api/${endpoint}`, init)
+        : await fetch(`/api/${endpoint}`, init);
       setHttpStatus(res.status);
 
       if (res.status === 402) {
         setStatus('payment-required');
         setErr(
           !isConnected
-            ? 'This call costs $0.02 in USDC. Connect a wallet (top right) and run again — payment happens automatically via x402.'
+            ? `This call costs $${cost.toFixed(2)} in USDC. Connect a wallet (top right) and run again — payment happens automatically via x402.`
             : wrongChain
               ? 'Wallet is on the wrong network. Switch to Base (top right) and run again.'
               : 'The server still wants payment — the wallet payment did not go through. Run again to retry.',
@@ -226,6 +241,14 @@ export function HeroPrompt() {
       setErr(paymentErrorMessage(error));
     }
   }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
+    await execute(parsed.endpoint, parsed.params, parsed.cost);
+  }
+
+  const nextActions = (response?.next_actions as NextAction[] | undefined) ?? [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-9 items-start">
@@ -326,13 +349,13 @@ export function HeroPrompt() {
           </span>
           <span className="text-[#4F5354]">·</span>
           <span className="text-[#8A8E8C]">
-            {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(parsed?.endpoint)}` : '—'}
+            {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(active?.endpoint)}` : '—'}
           </span>
           <span className="ml-auto" style={{ color: STATUS_COLOR[status] }}>
             {status === 'ok'
-              ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} settled`
+              ? `−$${(active?.cost ?? 0.02).toFixed(2)} settled`
               : status === 'payment-required'
-                ? `$${parsed?.cost.toFixed(2) ?? '0.02'} due`
+                ? `$${(active?.cost ?? 0.02).toFixed(2)} due`
                 : status === 'paying'
                   ? 'authorizing…'
                   : status === 'calling'
@@ -359,7 +382,7 @@ export function HeroPrompt() {
           {loading && [0,1,2,3].map((i) => (
             <div key={i} className="h-14 rounded border border-[#22262A] bg-[#15181A] animate-pulse" style={{ opacity: 1 - i * 0.18 }} />
           ))}
-          {response && extractRows(response, parsed?.endpoint).slice(0, 4).map((row, i) => {
+          {response && extractRows(response, active?.endpoint).slice(0, 4).map((row, i) => {
             const best = i === 0;
             return (
               <div
@@ -375,21 +398,68 @@ export function HeroPrompt() {
               >
                 <span className="font-mono text-[11px] text-[#4F5354]">{String(i + 1).padStart(2, '0')}</span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{row.title}</div>
+                  {row.url ? (
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold truncate block hover:text-[#9DFFB5]"
+                    >
+                      {row.title} <span className="text-[#4F5354]">↗</span>
+                    </a>
+                  ) : (
+                    <div className="text-sm font-semibold truncate">{row.title}</div>
+                  )}
                   {row.subtitle ? <div className="text-[11px] text-[#8A8E8C] font-mono mt-0.5 truncate">{row.subtitle}</div> : null}
                 </div>
                 <span className="font-mono text-lg font-bold" style={{ color: best ? '#9DFFB5' : '#F1F1EE' }}>
                   {row.price ? `$${row.price}` : '—'}
                 </span>
-                <span className="font-mono text-[9px] tracking-[1.4px]" style={{ color: best ? '#9DFFB5' : '#4F5354' }}>
-                  {best && row.price ? '★ MATCH' : ''}
-                </span>
+                {best && row.url ? (
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[9px] tracking-[1.4px] text-[#9DFFB5] hover:underline"
+                  >
+                    VIEW SHOP ↗
+                  </a>
+                ) : (
+                  <span className="font-mono text-[9px] tracking-[1.4px]" style={{ color: best ? '#9DFFB5' : '#4F5354' }}>
+                    {best && row.price ? '★ MATCH' : ''}
+                  </span>
+                )}
               </div>
             );
           })}
           {response && response.summary ? (
             <div className="text-[11px] text-[#8A8E8C] font-mono mt-2">{response.summary as string}</div>
           ) : null}
+          {response && nextActions.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-[#22262A]">
+              <div className="text-[10px] font-mono text-[#4F5354] tracking-[1.4px] mb-2">
+                NEXT · keep digging
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {nextActions.map((a) => (
+                  <button
+                    key={a.action}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => execute(a.endpoint, a.body, a.price_usdc)}
+                    className="text-left px-3 py-2 rounded border border-[#22262A] bg-[#15181A] hover:border-[#9DFFB5]/50 hover:bg-[#142219] disabled:opacity-50 group"
+                  >
+                    <span className="text-xs text-[#F1F1EE] group-hover:text-[#9DFFB5]">
+                      {a.description}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#4F5354] ml-2">
+                      /{a.endpoint} · ${a.price_usdc.toFixed(2)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <style>{`@keyframes rowAppear { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }`}</style>

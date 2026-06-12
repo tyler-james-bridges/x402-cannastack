@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useX402Fetch } from '@/lib/use-x402-fetch';
+import { NextActionChips, readPrefill, type NextAction } from '@/components/next-actions';
 
 interface Match {
   name: string;
@@ -31,6 +32,7 @@ interface SearchResult {
   dispensaries_searched: number;
   results: DispensaryResult[];
   summary: string;
+  next_actions?: NextAction[];
 }
 
 const geneticsColor: Record<string, string> = {
@@ -48,6 +50,18 @@ export function StrainFinderSearch() {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
+
+  // Prefill from URL params so next_actions links land ready to run.
+  // Prefill only — running (and paying) stays a deliberate click.
+  // (Client-only URL read after mount is the documented hydration-safe
+  // pattern; the synchronous setState is intentional, hence the suppression.)
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const q = readPrefill(['strain', 'location']);
+    if (q.strain) setStrain(q.strain);
+    if (q.location) setLocation(q.location);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -252,6 +266,7 @@ export function StrainFinderSearch() {
               );
             })
           )}
+          <NextActionChips actions={result.next_actions} />
         </div>
       )}
     </div>

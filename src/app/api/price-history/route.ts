@@ -7,6 +7,7 @@ import { getCached, setCache } from '@/lib/cache';
 import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { clampInt, likePattern, MAX_QUERY_LENGTH } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
+import { nextForPriceHistory } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
@@ -210,6 +211,12 @@ async function handler(req: NextRequest) {
       history,
       stats,
       summary,
+      next_actions: nextForPriceHistory({
+        strain,
+        dispensary: dispensaryName,
+        category,
+        location,
+      }),
       response_ms: responseMs,
     };
 
