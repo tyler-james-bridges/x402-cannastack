@@ -364,7 +364,7 @@ export function HeroPrompt() {
           </span>
         </div>
 
-        <div className="p-3.5 min-h-[340px] flex flex-col gap-2">
+        <div className="p-3.5 min-h-[160px] lg:min-h-[340px] flex flex-col gap-2">
           {err && (
             <div
               className={`text-xs font-mono px-3 py-2.5 rounded border ${

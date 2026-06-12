@@ -14,8 +14,8 @@ function project(lat: number, lng: number) {
   const x = (lng + 125) / (125 - 66);
   const y = 1 - (lat - 24) / (49 - 24);
   return {
-    x: Math.max(0.02, Math.min(0.98, x)),
-    y: Math.max(0.04, Math.min(0.96, y)),
+    x: Math.max(0.06, Math.min(0.93, x)),
+    y: Math.max(0.08, Math.min(0.92, y)),
   };
 }
 
@@ -61,7 +61,7 @@ export function UsMap() {
 
   return (
     <div className="absolute inset-0">
-      <div className="absolute top-2.5 left-3 z-10 text-[10px] font-mono text-[#4F5354] tracking-[1.4px]">
+      <div className="absolute top-2 right-2.5 z-20 text-[10px] font-mono text-[#4F5354] tracking-[1.4px] bg-[#111315]/90 px-1.5 py-0.5 rounded">
         COVERAGE{metros.length > 0 ? ` · ${metros.filter((m) => m.enabled).length} METROS` : ''}
       </div>
       {grid.map((g, i) => (
@@ -78,14 +78,17 @@ export function UsMap() {
         />
       ))}
       {/* coverage layer: crawled metros */}
-      {metros.map((m) => {
+      {metros.map((m, idx) => {
         const [lat, lng] = m.c!;
         const p = project(lat, lng);
         const name = m.name.split(',')[0].toLowerCase();
+        // Alternate label placement above/below the pin so dense clusters
+        // (the California coast especially) don't overprint each other.
+        const below = idx % 2 === 0;
         return (
           <div
             key={m.id}
-            className="absolute flex items-center gap-1"
+            className="absolute"
             style={{
               left: `${p.x * 100}%`,
               top: `${p.y * 100}%`,
@@ -100,7 +103,14 @@ export function UsMap() {
                 background: m.enabled ? '#7AB8FF' : '#4F5354',
               }}
             />
-            <span className="hidden sm:block font-mono text-[9px] text-[#4F5354] whitespace-nowrap">
+            <span
+              className="hidden sm:block absolute font-mono text-[9px] leading-none text-[#4F5354] whitespace-nowrap bg-[#111315]/85 px-0.5 rounded-sm"
+              style={{
+                left: '50%',
+                transform: 'translateX(-50%)',
+                ...(below ? { top: 8 } : { bottom: 8 }),
+              }}
+            >
               {name}
             </span>
           </div>

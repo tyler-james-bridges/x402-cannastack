@@ -44,7 +44,7 @@ export default async function Home() {
     : null;
 
   return (
-    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans">
+    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans overflow-x-clip">
       {datasetJsonLd && (
         <script
           type="application/ld+json"
@@ -58,14 +58,14 @@ export default async function Home() {
           <span className="w-2.5 h-2.5 bg-[#9DFFB5] rounded-sm shadow-[0_0_12px_#9DFFB5]" />
           CANNASTACK
         </span>
-        <span className="text-[#4F5354]">/</span>
-        <span className="text-[#8A8E8C]">agent-native cannabis data · x402</span>
-        <LiveMeter className="ml-auto" />
+        <span className="text-[#4F5354] hidden sm:inline">/</span>
+        <span className="text-[#8A8E8C] hidden sm:inline">agent-native cannabis data · x402</span>
+        <LiveMeter className="ml-auto hidden md:inline" />
         <span className="text-[#4F5354] hidden md:inline">│</span>
         <a href="/docs" className="hidden md:inline hover:text-[#9DFFB5]">docs</a>
         <a href="https://github.com/tyler-james-bridges/x402-cannastack" className="hidden md:inline hover:text-[#9DFFB5]">github</a>
         <span className="text-[#4F5354] hidden md:inline">│</span>
-        <ConnectWallet />
+        <ConnectWallet className="ml-auto md:ml-0" />
       </div>
 
       {/* HERO — prompt + live response */}
@@ -78,7 +78,7 @@ export default async function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-7">
           <div className="flex flex-col gap-4 min-w-0">
             <IndexStats snapshot={snapshot} />
-            <div className="flex-1 min-h-[220px] relative border border-[#22262A] rounded-md overflow-hidden bg-[#111315]">
+            <div className="flex-1 min-h-[170px] sm:min-h-[220px] relative border border-[#22262A] rounded-md overflow-hidden bg-[#111315]">
               <UsMap />
             </div>
           </div>

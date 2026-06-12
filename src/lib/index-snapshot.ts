@@ -23,7 +23,10 @@ export async function fetchIndexSnapshot(): Promise<IndexSnapshot | null> {
           (SELECT COUNT(*) FROM menu_items) as total_menu_items,
           (SELECT COUNT(*) FROM dispensaries) as total_dispensaries,
           (SELECT COUNT(*) FROM price_history) as total_price_changes,
-          (SELECT MAX(completed_at) FROM crawl_runs) as last_crawl
+          GREATEST(
+            (SELECT MAX(completed_at) FROM crawl_runs),
+            (SELECT MAX(crawled_at) FROM menu_items)
+          ) as last_crawl
       `,
       sql`SELECT name, enabled FROM metros ORDER BY id`,
     ]);

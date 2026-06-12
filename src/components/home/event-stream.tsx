@@ -80,10 +80,8 @@ export function EventStream() {
           {rows.map((r, i) => (
             <div
               key={`${r.ts}-${r.text}-${i}`}
-              className="grid items-center py-1.5 border-b border-[#22262A] text-xs font-mono"
+              className="grid items-center py-1.5 border-b border-[#22262A] text-xs font-mono gap-1.5 sm:gap-2 grid-cols-[44px_12px_minmax(0,1fr)_44px] sm:grid-cols-[64px_14px_minmax(0,1fr)_52px]"
               style={{
-                gridTemplateColumns: '64px 14px 1fr 56px',
-                gap: 8,
                 opacity: i === 0 ? 1 : Math.max(0.32, 1 - i * 0.04),
               }}
             >
