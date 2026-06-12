@@ -72,6 +72,18 @@ test('crawl queue', async (t) => {
       assert.equal(stats.running, 0);
     });
 
+    await t.test('enqueue fans out one run per metro per source', async () => {
+      await resetDb();
+      const result = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps', 'leafly']);
+      assert.equal(result.enqueued.length, 4);
+
+      const rows = await sql`SELECT metro_id, source FROM crawl_runs ORDER BY metro_id, source`;
+      assert.deepEqual(
+        rows.map((r) => `${r.metro_id}:${r.source}`),
+        [`${metroA.id}:leafly`, `${metroA.id}:weedmaps`, `${metroB.id}:leafly`, `${metroB.id}:weedmaps`],
+      );
+    });
+
     await t.test('claim moves oldest pending run to running and increments attempts', async () => {
       await resetDb();
       await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
