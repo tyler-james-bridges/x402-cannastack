@@ -185,6 +185,30 @@ test('crawl queue', async (t) => {
       const disps = await sql`SELECT COUNT(*) AS n FROM dispensaries`;
       assert.equal(Number(disps[0].n), 1);
     });
+
+    await t.test('execution heartbeats claimed_at so in-progress runs are not reclaimed', async () => {
+      await resetDb();
+      const stubAdapter: DataSourceAdapter = {
+        name: 'weedmaps',
+        async findDispensaries() {
+          return [{ source: 'weedmaps', sourceId: 'disp-1', name: 'Stub Dispensary' }];
+        },
+        async fetchMenu() {
+          return [{ sourceItemId: 'item-1', name: 'Blue Dream', category: 'flower' }];
+        },
+      };
+
+      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
+      const claimed = await claimNextRun(sql);
+      assert.ok(claimed);
+
+      // Simulate a long-running crawl whose claim is about to look stale
+      await sql`UPDATE crawl_runs SET claimed_at = NOW() - interval '20 minutes' WHERE id = ${claimed.runId}`;
+      await executeCrawlRun(sql, claimed.runId, claimed.metro, stubAdapter);
+
+      const row = (await sql`SELECT claimed_at > NOW() - interval '1 minute' AS fresh FROM crawl_runs WHERE id = ${claimed.runId}`)[0];
+      assert.equal(row.fresh, true, 'stage transitions refresh the liveness heartbeat');
+    });
   } finally {
     await proxy.close();
   }

@@ -53,10 +53,13 @@ RETURNING ...
 
 - A run that **throws during execution** is marked `failed` (terminal, not
   retried) — same behavior as before the queue existed.
-- A run whose **worker dies mid-flight** stays `running`; after
-  `CRAWL_STUCK_AFTER_MINUTES` (default 15) it becomes claimable again and is
-  re-executed from scratch. Loads are idempotent upserts keyed on stable item
-  keys, so re-execution is safe.
+- A run whose **worker dies mid-flight** stays `running`; once its
+  `claimed_at` liveness heartbeat is older than `CRAWL_STUCK_AFTER_MINUTES`
+  (default 15) it becomes claimable again and is re-executed from scratch.
+  Executing runs refresh the heartbeat at every stage transition and per
+  extract batch, so legitimately long crawls (CLI runs included) are not
+  reclaimed while still making progress. Loads are idempotent upserts keyed
+  on stable item keys, so re-execution is safe.
 - After `CRAWL_MAX_ATTEMPTS` (default 3) claims without completing, the run is
   marked `failed` with an explanatory `error_message` instead of looping
   forever.

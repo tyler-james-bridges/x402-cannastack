@@ -95,10 +95,22 @@ function pricesChanged(row: Record<string, unknown>, item: RawMenuItem): boolean
   );
 }
 
+// claimed_at doubles as a liveness heartbeat: the queue reclaims a 'running'
+// row only when claimed_at is older than the stuck window, so refresh it as
+// the run makes progress. Otherwise a legitimately long crawl (CLI runs
+// especially) would be "reclaimed" and executed twice concurrently.
 async function updateRunStage(sql: Sql, runId: number, stage: CrawlRunStage) {
   await sql`
     UPDATE crawl_runs
-    SET stage = ${stage}
+    SET stage = ${stage}, claimed_at = NOW()
+    WHERE id = ${runId}
+  `;
+}
+
+async function heartbeatRun(sql: Sql, runId: number) {
+  await sql`
+    UPDATE crawl_runs
+    SET claimed_at = NOW()
     WHERE id = ${runId}
   `;
 }
@@ -355,6 +367,10 @@ async function extractStage(
     );
 
     extracted.push(...batchResults);
+
+    // Extract is the long pole of a crawl; keep the liveness heartbeat fresh
+    // per batch so slow source APIs don't get the run reclaimed mid-flight.
+    await heartbeatRun(sql, runId);
 
     if (i + CONCURRENCY < dispensaries.length) {
       await sleep(DELAY_MS);

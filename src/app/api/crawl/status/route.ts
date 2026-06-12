@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { queueStats } from '@/lib/crawl-queue';
 import { apiHeaders, preflight } from '@/lib/api-response';
 
 export const OPTIONS = preflight;
@@ -28,16 +29,14 @@ export async function GET() {
   try {
     const sql = getDb();
 
+    // Fetch all columns for the sentinel tables and compare in JS so
+    // EXPECTED_COLUMNS stays the single source of truth.
+    const sentinelTables = [...new Set(EXPECTED_COLUMNS.map(([t]) => t))];
     const presentColumns = await sql`
       SELECT table_name, column_name
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND (table_name, column_name) IN (
-          ('menu_items', 'available'),
-          ('menu_items', 'source_item_key'),
-          ('crawl_runs', 'claimed_at'),
-          ('crawl_runs', 'attempts')
-        )
+        AND table_name = ANY(${sentinelTables})
     `;
     const present = new Set(presentColumns.map((c) => `${c.table_name}.${c.column_name}`));
     const missingColumns = EXPECTED_COLUMNS.map(([t, c]) => `${t}.${c}`).filter(
@@ -89,17 +88,11 @@ export async function GET() {
           (SELECT COUNT(*) FROM crawl_runs WHERE status = 'failed') as failed_runs,
           (SELECT MAX(completed_at) FROM crawl_runs) as last_crawl
       `,
-      sql`
-        SELECT
-          COUNT(*) FILTER (WHERE status = 'pending') as pending_runs,
-          COUNT(*) FILTER (WHERE status = 'running') as running_runs,
-          MIN(started_at) FILTER (WHERE status = 'pending') as oldest_pending_at
-        FROM crawl_runs
-      `,
+      queueStats(sql),
     ]);
 
     return NextResponse.json(
-      { ok: true, schema, metros, stats: stats[0], queue: queue[0], recentCrawls, recentWarnings },
+      { ok: true, schema, metros, stats: stats[0], queue, recentCrawls, recentWarnings },
       { headers: apiHeaders() },
     );
   } catch (err) {

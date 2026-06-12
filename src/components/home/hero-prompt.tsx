@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useX402Fetch } from '@/lib/use-x402-fetch';
+import { PRICE_USDC } from '@/lib/analytics-types';
 
 type Parsed = {
   endpoint: 'strain-finder' | 'price-compare' | 'deal-scout' | 'price-history';
@@ -10,9 +11,13 @@ type Parsed = {
   highlights: { term: string; kind: 'strain' | 'location' | 'price' | 'category' }[];
 };
 
+// Single source of truth for per-endpoint pricing — keep the hero's RUN
+// button in sync with what the API actually charges.
 const PRICE: Record<Parsed['endpoint'], number> = {
-  'strain-finder': 0.02, 'price-compare': 0.02, 'deal-scout': 0.02,
-  'price-history': 0.02,
+  'strain-finder': PRICE_USDC['strain-finder'] ?? 0.02,
+  'price-compare': PRICE_USDC['price-compare'] ?? 0.02,
+  'deal-scout': PRICE_USDC['deal-scout'] ?? 0.02,
+  'price-history': PRICE_USDC['price-history'] ?? 0.02,
 };
 
 // Cheap regex router — covers ~80% of demo queries deterministically.
