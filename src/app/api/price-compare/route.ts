@@ -5,7 +5,7 @@ import { findNearbyDispensaries, searchCategoryInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchCategory } from '@/lib/fallback';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
 import { bestPrice } from '@/lib/pricing';
 import { clampInt, MAX_RADIUS_MI, MAX_RESULT_LIMIT } from '@/lib/validate';
@@ -157,8 +157,7 @@ async function handler(req: NextRequest) {
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'price-compare', source, cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'price-compare');
+    return internalError(err, 'price-compare');
   }
 }
 

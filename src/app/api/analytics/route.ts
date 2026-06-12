@@ -52,7 +52,10 @@ export async function GET() {
       { headers: apiHeaders() },
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500, headers: apiHeaders() });
+    console.error('[analytics] error:', err);
+    return NextResponse.json(
+      { ok: false, error: 'Analytics unavailable — check server logs.' },
+      { status: 500, headers: apiHeaders() },
+    );
   }
 }

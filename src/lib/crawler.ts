@@ -95,18 +95,30 @@ function pricesChanged(row: Record<string, unknown>, item: RawMenuItem): boolean
   );
 }
 
+// claimed_at doubles as a liveness heartbeat: the queue reclaims a 'running'
+// row only when claimed_at is older than the stuck window, so refresh it as
+// the run makes progress. Otherwise a legitimately long crawl (CLI runs
+// especially) would be "reclaimed" and executed twice concurrently.
 async function updateRunStage(sql: Sql, runId: number, stage: CrawlRunStage) {
   await sql`
     UPDATE crawl_runs
-    SET stage = ${stage}
+    SET stage = ${stage}, claimed_at = NOW()
+    WHERE id = ${runId}
+  `;
+}
+
+async function heartbeatRun(sql: Sql, runId: number) {
+  await sql`
+    UPDATE crawl_runs
+    SET claimed_at = NOW()
     WHERE id = ${runId}
   `;
 }
 
 async function createCrawlRun(sql: Sql, metro: Metro, source: string): Promise<number> {
   const result = await sql`
-    INSERT INTO crawl_runs (metro_id, source, status, stage)
-    VALUES (${metro.id}, ${source}, 'running', 'setup')
+    INSERT INTO crawl_runs (metro_id, source, status, stage, claimed_at, attempts)
+    VALUES (${metro.id}, ${source}, 'running', 'setup', NOW(), 1)
     RETURNING id
   `;
 
@@ -356,6 +368,10 @@ async function extractStage(
 
     extracted.push(...batchResults);
 
+    // Extract is the long pole of a crawl; keep the liveness heartbeat fresh
+    // per batch so slow source APIs don't get the run reclaimed mid-flight.
+    await heartbeatRun(sql, runId);
+
     if (i + CONCURRENCY < dispensaries.length) {
       await sleep(DELAY_MS);
     }
@@ -566,13 +582,19 @@ async function failRun(sql: Sql, runId: number, stage: CrawlRunStage, err: unkno
   `;
 }
 
-export async function crawlMetro(
+/**
+ * Execute the staged ETL pipeline for an existing crawl_runs row (created by
+ * the enqueue trigger and claimed by a worker, or by crawlMetro below).
+ * All load operations are idempotent upserts keyed on stable item keys, so
+ * re-executing a reclaimed run is safe.
+ */
+export async function executeCrawlRun(
   sql: Sql,
+  runId: number,
   metro: Metro,
   adapter: DataSourceAdapter,
 ): Promise<CrawlResult> {
   const startTime = Date.now();
-  const runId = await createCrawlRun(sql, metro, adapter.name);
   let currentStage: CrawlRunStage = 'setup';
 
   console.log(`Crawling ${metro.name} via ${adapter.name} with run ${runId}...`);
@@ -630,4 +652,17 @@ export async function crawlMetro(
     await failRun(sql, runId, currentStage, err);
     throw err;
   }
+}
+
+/**
+ * Create a run row and execute it immediately. Used by the CLI crawl scripts;
+ * the HTTP path enqueues pending runs instead and lets the worker claim them.
+ */
+export async function crawlMetro(
+  sql: Sql,
+  metro: Metro,
+  adapter: DataSourceAdapter,
+): Promise<CrawlResult> {
+  const runId = await createCrawlRun(sql, metro, adapter.name);
+  return executeCrawlRun(sql, runId, metro, adapter);
 }
