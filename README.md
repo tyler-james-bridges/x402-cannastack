@@ -34,7 +34,7 @@ Vercel Cron (every 6h)
  API  Web UI   Bankr
 ```
 
-**Data sources:** Weedmaps public API (live). A Leafly adapter exists in `src/lib/adapters/leafly.ts` but is disabled in the crawl route until their public API access is confirmed.
+**Data sources:** Weedmaps public API (live). New sources implement `DataSourceAdapter` and register in `src/lib/adapters/index.ts`. (A Leafly adapter was removed in June 2026 because its public API access was never confirmed — see git history if it's ever worth revisiting.)
 
 **Stack:** Next.js, Neon Postgres, Vercel, Tailwind, x402/Bankr Cloud.
 

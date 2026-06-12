@@ -74,13 +74,13 @@ test('crawl queue', async (t) => {
 
     await t.test('enqueue fans out one run per metro per source', async () => {
       await resetDb();
-      const result = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps', 'leafly']);
+      const result = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps', 'othersource']);
       assert.equal(result.enqueued.length, 4);
 
       const rows = await sql`SELECT metro_id, source FROM crawl_runs ORDER BY metro_id, source`;
       assert.deepEqual(
         rows.map((r) => `${r.metro_id}:${r.source}`),
-        [`${metroA.id}:leafly`, `${metroA.id}:weedmaps`, `${metroB.id}:leafly`, `${metroB.id}:weedmaps`],
+        [`${metroA.id}:othersource`, `${metroA.id}:weedmaps`, `${metroB.id}:othersource`, `${metroB.id}:weedmaps`],
       );
     });
 
