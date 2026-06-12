@@ -5,7 +5,7 @@ import { findNearbyDispensaries, searchDealsInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchDeals } from '@/lib/fallback';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
 import { bestPriceValue } from '@/lib/pricing';
 import { clampInt, MAX_RADIUS_MI } from '@/lib/validate';
@@ -222,8 +222,7 @@ async function handler(req: NextRequest) {
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'deal-scout', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'deal-scout');
+    return internalError(err, 'deal-scout');
   }
 }
 

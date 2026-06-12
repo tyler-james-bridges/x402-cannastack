@@ -4,6 +4,18 @@ import { apiHeaders, preflight } from '@/lib/api-response';
 
 export const OPTIONS = preflight;
 
+// Sentinel columns from each migration era. If any are missing, the deployed
+// code is newer than the database schema (migrations didn't run) — the exact
+// failure mode that once 500'd every paid endpoint in prod. Checked first and
+// short-circuited, because the detailed queries below would themselves fail
+// against a stale schema.
+const EXPECTED_COLUMNS: Array<[string, string]> = [
+  ['menu_items', 'available'],
+  ['menu_items', 'source_item_key'],
+  ['crawl_runs', 'claimed_at'],
+  ['crawl_runs', 'attempts'],
+];
+
 export async function GET() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -15,6 +27,38 @@ export async function GET() {
 
   try {
     const sql = getDb();
+
+    const presentColumns = await sql`
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND (table_name, column_name) IN (
+          ('menu_items', 'available'),
+          ('menu_items', 'source_item_key'),
+          ('crawl_runs', 'claimed_at'),
+          ('crawl_runs', 'attempts')
+        )
+    `;
+    const present = new Set(presentColumns.map((c) => `${c.table_name}.${c.column_name}`));
+    const missingColumns = EXPECTED_COLUMNS.map(([t, c]) => `${t}.${c}`).filter(
+      (tc) => !present.has(tc),
+    );
+    const schema = {
+      migrated: missingColumns.length === 0,
+      missing_columns: missingColumns,
+    };
+
+    if (!schema.migrated) {
+      return NextResponse.json(
+        {
+          ok: false,
+          schema,
+          error:
+            'Database schema is behind the deployed code — run `npm run db:migrate` against this database. Detailed status is skipped because its queries need the missing columns.',
+        },
+        { headers: apiHeaders() },
+      );
+    }
 
     const [metros, recentCrawls, recentWarnings, stats, queue] = await Promise.all([
       sql`SELECT id, name, enabled FROM metros ORDER BY id`,
@@ -55,11 +99,14 @@ export async function GET() {
     ]);
 
     return NextResponse.json(
-      { ok: true, metros, stats: stats[0], queue: queue[0], recentCrawls, recentWarnings },
+      { ok: true, schema, metros, stats: stats[0], queue: queue[0], recentCrawls, recentWarnings },
       { headers: apiHeaders() },
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed';
-    return NextResponse.json({ ok: false, error: message }, { status: 500, headers: apiHeaders() });
+    console.error('[crawl/status] error:', err);
+    return NextResponse.json(
+      { ok: false, error: 'Status unavailable — check server logs.' },
+      { status: 500, headers: apiHeaders() },
+    );
   }
 }

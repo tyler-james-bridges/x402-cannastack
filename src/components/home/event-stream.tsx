@@ -11,7 +11,8 @@ function ago(ts: string) {
   if (s < 1) return 'now';
   if (s < 60) return `-${s.toFixed(1)}s`;
   if (s < 3600) return `-${Math.floor(s / 60)}m`;
-  return `-${Math.floor(s / 3600)}h`;
+  if (s < 172800) return `-${Math.floor(s / 3600)}h`;
+  return `-${Math.floor(s / 86400)}d`;
 }
 
 export function EventStream() {

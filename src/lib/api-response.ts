@@ -73,3 +73,16 @@ export function serverError(message: string, endpoint: EndpointName) {
     { status: 500, headers: apiHeaders({ endpoint }) },
   );
 }
+
+/**
+ * 500 for unexpected exceptions. Logs the real error server-side and returns a
+ * generic message — raw exception text (SQL errors especially) must never
+ * reach clients. Failed requests are never settled, so callers aren't charged.
+ */
+export function internalError(err: unknown, endpoint: EndpointName) {
+  console.error(`[${endpoint}] handler error:`, err);
+  return serverError(
+    'Internal error. Your request was not charged — retry shortly.',
+    endpoint,
+  );
+}

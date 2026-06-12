@@ -4,7 +4,7 @@ import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { clampInt, likePattern, MAX_QUERY_LENGTH } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
 
@@ -216,8 +216,7 @@ async function handler(req: NextRequest) {
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'price-history', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'price-history');
+    return internalError(err, 'price-history');
   }
 }
 

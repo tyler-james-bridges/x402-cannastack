@@ -5,7 +5,7 @@ import { findNearbyDispensaries, searchStrainInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchStrain } from '@/lib/fallback';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
 import { bestPriceValue } from '@/lib/pricing';
 import { clampInt, MAX_QUERY_LENGTH, MAX_RADIUS_MI } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
@@ -185,8 +185,7 @@ async function handler(req: NextRequest) {
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'strain-finder', source, cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'strain-finder');
+    return internalError(err, 'strain-finder');
   }
 }
 
