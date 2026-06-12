@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { getDb } from '@/lib/db';
 import { apiHeaders, preflight } from '@/lib/api-response';
 
 export const OPTIONS = preflight;
@@ -14,12 +14,13 @@ export async function GET() {
   }
 
   try {
-    const sql = neon(databaseUrl);
+    const sql = getDb();
 
-    const [metros, recentCrawls, recentWarnings, stats] = await Promise.all([
+    const [metros, recentCrawls, recentWarnings, stats, queue] = await Promise.all([
       sql`SELECT id, name, enabled FROM metros ORDER BY id`,
       sql`
         SELECT cr.id, cr.metro_id, m.name as metro_name, cr.source, cr.status, cr.stage,
+               cr.attempts, cr.claimed_at,
                cr.dispensaries_found, cr.items_extracted, cr.items_loaded,
                cr.items_new, cr.items_updated, cr.items_skipped, cr.items_stale,
                cr.warnings_count, cr.errors_count, cr.error_message,
@@ -44,10 +45,17 @@ export async function GET() {
           (SELECT COUNT(*) FROM crawl_runs WHERE status = 'failed') as failed_runs,
           (SELECT MAX(completed_at) FROM crawl_runs) as last_crawl
       `,
+      sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'pending') as pending_runs,
+          COUNT(*) FILTER (WHERE status = 'running') as running_runs,
+          MIN(started_at) FILTER (WHERE status = 'pending') as oldest_pending_at
+        FROM crawl_runs
+      `,
     ]);
 
     return NextResponse.json(
-      { ok: true, metros, stats: stats[0], recentCrawls, recentWarnings },
+      { ok: true, metros, stats: stats[0], queue: queue[0], recentCrawls, recentWarnings },
       { headers: apiHeaders() },
     );
   } catch (err) {

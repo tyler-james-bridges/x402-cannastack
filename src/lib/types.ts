@@ -45,7 +45,7 @@ export interface ExtractedDispensary {
   menuItems: RawMenuItem[];
 }
 
-export type CrawlRunStatus = 'running' | 'success' | 'failed';
+export type CrawlRunStatus = 'pending' | 'running' | 'success' | 'failed';
 
 export type CrawlRunStage = 'setup' | 'extract' | 'transform' | 'load' | 'cleanup';
 

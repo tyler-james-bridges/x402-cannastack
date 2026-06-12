@@ -3,6 +3,10 @@
     {
       "path": "/api/crawl",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/crawl/worker",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
