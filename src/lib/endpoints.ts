@@ -45,6 +45,17 @@ export const ENDPOINTS: EndpointSpec[] = [
         },
       ],
       summary: 'Searched 24 dispensaries near Denver, CO for "Blue Dream". Found 12 matches at 8 dispensaries. Cheapest: $28 at Native Roots.',
+      next_actions: [
+        {
+          action: 'price-history',
+          description: 'Is "Blue Dream" trending up or down? 30-day price history.',
+          method: 'POST',
+          endpoint: 'price-history',
+          url: 'https://cannastack.0x402.sh/api/price-history',
+          price_usdc: 0.02,
+          body: { strain: 'Blue Dream', location: 'Denver, CO', days: 30 },
+        },
+      ],
       response_ms: 612,
     },
   },

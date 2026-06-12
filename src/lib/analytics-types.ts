@@ -12,6 +12,13 @@ export type RecentRow = {
   location_lng: number | null;
 };
 
+export type ActivityDay = {
+  day: string; // YYYY-MM-DD
+  queries: number;
+  price_changes: number;
+  items_crawled: number;
+};
+
 export type AnalyticsResponse = {
   ok: true;
   total_requests: number;
@@ -21,6 +28,7 @@ export type AnalyticsResponse = {
   top_locations: { location_query: string; cnt: number }[];
   top_strains: { strain: string; cnt: number }[];
   recent: RecentRow[];
+  activity?: ActivityDay[];
 };
 
 export const PRICE_USDC: Record<string, number> = {
@@ -55,3 +63,29 @@ export function coordsFor(row: RecentRow): [number, number] | null {
   const k = (row.location_query || '').toLowerCase().trim();
   return CITY_COORDS[k] ?? null;
 }
+
+// Shape served by GET /api/crawl/status (free discovery endpoint).
+export type CrawlStatusResponse = {
+  ok: boolean;
+  schema?: { migrated: boolean; missing_columns: string[] };
+  metros?: { id: number; name: string; enabled: boolean }[];
+  stats?: {
+    total_dispensaries: string;
+    total_menu_items: string;
+    total_price_changes: string;
+    unavailable_menu_items: string;
+    failed_runs: string;
+    last_crawl: string | null;
+  };
+  recentCrawls?: {
+    id: number;
+    metro_name: string;
+    source: string;
+    status: string;
+    items_loaded: number | null;
+    items_new: number | null;
+    items_updated: number | null;
+    completed_at: string | null;
+    started_at: string;
+  }[];
+};

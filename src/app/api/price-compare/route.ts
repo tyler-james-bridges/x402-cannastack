@@ -10,6 +10,7 @@ import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
 import { bestPrice } from '@/lib/pricing';
 import { clampInt, MAX_RADIUS_MI, MAX_RESULT_LIMIT } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
+import { nextForPriceCompare } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
@@ -151,6 +152,11 @@ async function handler(req: NextRequest) {
       results,
       stats: { min, max, avg, count: results.length },
       summary,
+      next_actions: nextForPriceCompare({
+        category: categoryInput,
+        location,
+        cheapestName: results[0]?.name,
+      }),
       response_ms: responseMs,
     };
 

@@ -14,7 +14,7 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans">
+    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans overflow-x-clip">
       <div className="flex items-center gap-4 px-6 py-3 border-b border-[#22262A] text-xs font-mono">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-wide hover:text-[#9DFFB5]">
           <span className="w-2.5 h-2.5 bg-[#9DFFB5] rounded-sm shadow-[0_0_12px_#9DFFB5]" />
@@ -22,9 +22,9 @@ export function PageShell({
         </Link>
         <span className="text-[#4F5354]">/</span>
         <span className="text-[#8A8E8C] truncate">{eyebrow}</span>
-        <LiveMeter variant="strip" className="ml-auto" />
+        <LiveMeter variant="strip" className="ml-auto hidden md:inline" />
         <span className="text-[#4F5354] hidden md:inline">│</span>
-        <ConnectWallet />
+        <ConnectWallet className="ml-auto md:ml-0" />
       </div>
 
       <section className="px-6 lg:px-9 py-8 border-b border-[#22262A]">

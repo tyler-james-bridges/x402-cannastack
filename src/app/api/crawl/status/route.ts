@@ -86,7 +86,10 @@ export async function GET() {
           (SELECT COUNT(*) FROM price_history) as total_price_changes,
           (SELECT COUNT(*) FROM menu_items WHERE available = false) as unavailable_menu_items,
           (SELECT COUNT(*) FROM crawl_runs WHERE status = 'failed') as failed_runs,
-          (SELECT MAX(completed_at) FROM crawl_runs) as last_crawl
+          GREATEST(
+            (SELECT MAX(completed_at) FROM crawl_runs),
+            (SELECT MAX(crawled_at) FROM menu_items)
+          ) as last_crawl
       `,
       queueStats(sql),
     ]);

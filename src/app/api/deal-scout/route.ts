@@ -10,6 +10,7 @@ import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
 import { bestPriceValue } from '@/lib/pricing';
 import { clampInt, MAX_RADIUS_MI } from '@/lib/validate';
 import { withPayment } from '@/lib/x402';
+import { nextForDealScout } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
@@ -142,6 +143,11 @@ async function handler(req: NextRequest) {
         deals_dispensaries: fallback.dealDisps.length,
         results,
         summary,
+        next_actions: nextForDealScout({
+          location,
+          category: categoryInput || undefined,
+          bestProductName: results[0]?.deal_products?.[0]?.name,
+        }),
         response_ms: responseMs,
       };
 
@@ -216,6 +222,11 @@ async function handler(req: NextRequest) {
       deals_dispensaries: dealDisps.length,
       results,
       summary,
+      next_actions: nextForDealScout({
+        location,
+        category: categoryInput || undefined,
+        bestProductName: results[0]?.deal_products?.[0]?.name,
+      }),
       response_ms: responseMs,
     };
 

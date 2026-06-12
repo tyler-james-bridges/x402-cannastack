@@ -43,10 +43,22 @@ function buildSpec() {
         },
         responses: {
           '200': {
-            description: 'Success',
+            description:
+              'Success. Every response includes `next_actions`: ready-to-send follow-up calls (endpoint URL + complete JSON body + price) so agents can chain workflows without guessing parameters. Dispensary results include a `url` field linking to the shop page for ordering.',
             content: {
               'application/json': {
-                schema: { type: 'object', example: ep.example_response },
+                schema: {
+                  type: 'object',
+                  example: ep.example_response,
+                  properties: {
+                    next_actions: {
+                      type: 'array',
+                      description:
+                        'Suggested follow-up calls. POST `body` as-is to `url` (paying via x402 the same way) to continue the workflow.',
+                      items: { $ref: '#/components/schemas/NextAction' },
+                    },
+                  },
+                },
               },
             },
           },
@@ -112,6 +124,31 @@ function buildSpec() {
     },
     servers: [{ url: BASE }],
     paths,
+    components: {
+      schemas: {
+        NextAction: {
+          type: 'object',
+          description:
+            'A ready-to-send follow-up call attached to every paid response so workflows never dead-end.',
+          required: ['action', 'description', 'method', 'endpoint', 'url', 'price_usdc', 'body'],
+          properties: {
+            action: { type: 'string', example: 'compare-category' },
+            description: {
+              type: 'string',
+              example: 'Compare all flower prices near Las Vegas to sanity-check these.',
+            },
+            method: { type: 'string', enum: ['POST'] },
+            endpoint: { type: 'string', example: 'price-compare' },
+            url: { type: 'string', example: `${BASE}/api/price-compare` },
+            price_usdc: { type: 'number', example: 0.02 },
+            body: {
+              type: 'object',
+              example: { category: 'flower', location: 'Las Vegas, NV' },
+            },
+          },
+        },
+      },
+    },
     'x-x402': {
       version: '1',
       payment: { protocol: 'x402', asset: 'USDC' },

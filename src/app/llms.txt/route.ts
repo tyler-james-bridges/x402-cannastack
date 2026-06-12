@@ -23,6 +23,20 @@ export async function GET() {
   lines.push('- US locations only. Provide a city name, "City, ST", or street address.');
   lines.push('- Geocoding and the underlying menu data come from Weedmaps; live-fallback kicks in when a metro is not yet in the database.');
   lines.push('');
+  lines.push('## Workflows (next_actions)');
+  lines.push('');
+  lines.push(
+    'Every paid response includes a `next_actions` array: ready-to-send follow-up calls with the endpoint `url`, a complete JSON `body`, and the `price_usdc`. To chain a workflow, POST the `body` as-is to the `url`, paying the same way — no parameter guessing. Examples of chains:',
+  );
+  lines.push('');
+  lines.push('- deal-scout -> price-compare (are these deals actually cheap?) -> strain-finder (where else carries the best item?)');
+  lines.push('- strain-finder -> price-history (is it trending down? wait or buy) -> deal-scout (any active deals first?)');
+  lines.push('- Empty results return a `widen-radius` action retrying the same search at 50 miles.');
+  lines.push('');
+  lines.push(
+    'Dispensary results include a `url` field — the shop page where a human can order. Surface it as the final call-to-action.',
+  );
+  lines.push('');
   lines.push('## Endpoints');
   lines.push('');
   for (const ep of ENDPOINTS) {
