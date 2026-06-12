@@ -7,7 +7,7 @@
 import { HeroPrompt } from '@/components/home/hero-prompt';
 import { LiveMeter, MeterStrip } from '@/components/home/live-meter';
 import { EventStream } from '@/components/home/event-stream';
-import { UsMap } from '@/components/home/us-map';
+import { ActivityGraph } from '@/components/home/activity-graph';
 import { IndexStats } from '@/components/home/index-stats';
 import { RateCard } from '@/components/home/rate-card';
 import { CurlSnippet } from '@/components/home/curl-snippet';
@@ -78,8 +78,8 @@ export default async function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-7">
           <div className="flex flex-col gap-4 min-w-0">
             <IndexStats snapshot={snapshot} />
-            <div className="flex-1 min-h-[170px] sm:min-h-[220px] relative border border-[#22262A] rounded-md overflow-hidden bg-[#111315]">
-              <UsMap />
+            <div className="flex-1 min-h-[170px] sm:min-h-[220px] border border-[#22262A] rounded-md overflow-hidden bg-[#111315]">
+              <ActivityGraph />
             </div>
           </div>
           <EventStream />
