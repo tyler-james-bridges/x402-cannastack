@@ -1,74 +1,67 @@
 // src/components/home/live-meter.tsx
-// USDC-settled counter. Snaps to the real value from /api/analytics every
-// 5s; between polls it ticks up smoothly using a bounded random drift so
-// the meter always feels alive, but never exceeds the next real reading.
+// Honest meters, no theater. The old 64px animated 24h counter (with its
+// random-drift ticker) is gone: at low volume it read as a ghost town, and a
+// simulated tick is the kind of thing that torches trust when noticed.
+//
+// - LiveMeter (top status strips): index size + crawl freshness.
+// - MeterStrip (below the index band): all-time unit economics. Cumulative
+//   numbers only go up; a 24h figure resets to embarrassing daily.
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { useAnalytics } from './use-analytics';
+import { useCrawlStatus } from './use-crawl-status';
+import { PRICE_USDC } from '@/lib/analytics-types';
 
-function fmt(n: number) {
-  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function crawledAgo(lastCrawl: string | null | undefined): string {
+  if (!lastCrawl) return '—';
+  const h = (Date.now() - new Date(lastCrawl).getTime()) / 3_600_000;
+  if (h < 1) return `${Math.max(1, Math.floor(h * 60))}m ago`;
+  return `${Math.floor(h)}h ago`;
 }
 
-export function LiveMeter({
-  variant = 'hero',
-  className = '',
-}: {
-  variant?: 'hero' | 'strip';
-  className?: string;
-}) {
-  const data = useAnalytics(5000);
-  const [display, setDisplay] = useState(0);
-  const targetRef = useRef(0);
-
-  useEffect(() => {
-    if (data) targetRef.current = data.usdc_24h;
-  }, [data]);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setDisplay((d) => {
-        const target = targetRef.current;
-        // Drift toward target; if behind, catch up; if ahead, hold.
-        if (d < target) return d + Math.min(target - d, Math.random() * 0.06 + 0.02);
-        return d;
-      });
-    }, 480);
-    return () => clearInterval(id);
-  }, []);
-
-  if (variant === 'strip') {
-    return (
-      <span className={`text-[#8A8E8C] ${className}`}>
-        settled 24h <span className="text-[#9DFFB5]">{fmt(display)}</span>
-        <span className="text-[#4F5354] mx-2">·</span>
-        {data ? data.reqs_24h.toLocaleString() : '—'} reqs
-      </span>
-    );
-  }
+export function LiveMeter({ className = '' }: { variant?: 'hero' | 'strip'; className?: string }) {
+  const crawl = useCrawlStatus(60_000);
+  const items = crawl?.stats ? Number(crawl.stats.total_menu_items) : null;
 
   return (
-    <div>
-      <div className="text-[11px] font-mono text-[#4F5354] tracking-[1.6px]">
-        USDC SETTLED · LAST 24H
-      </div>
-      <div
-        className="font-mono font-medium tabular-nums leading-none mt-1.5 text-[#F1F1EE]"
-        style={{ fontSize: 64, letterSpacing: -1.5 }}
-      >
-        {fmt(display)}
-        <span
-          className="inline-block ml-1.5 align-top bg-[#9DFFB5]"
-          style={{ width: 11, height: 56, animation: 'meterBlink 1s steps(2) infinite' }}
-        />
-      </div>
-      <div className="text-[13px] text-[#8A8E8C] font-mono mt-2.5">
-        {data ? data.reqs_24h.toLocaleString() : '—'} reqs · ~
-        {data ? Math.round(data.reqs_24h / 24 / 60) : '—'}/min
-      </div>
-      <style>{`@keyframes meterBlink { 50% { opacity: 0.2 } }`}</style>
+    <span className={`text-[#8A8E8C] ${className}`}>
+      index{' '}
+      <span className="text-[#9DFFB5]">{items === null ? '—' : items.toLocaleString()}</span>{' '}
+      items
+      <span className="text-[#4F5354] mx-2">·</span>
+      crawled {crawledAgo(crawl?.stats?.last_crawl)}
+    </span>
+  );
+}
+
+export function MeterStrip() {
+  const analytics = useAnalytics(5000);
+
+  const settledAllTime = (analytics?.by_endpoint ?? []).reduce(
+    (s, e) => s + (PRICE_USDC[e.endpoint] ?? 0.02) * Number(e.cnt),
+    0,
+  );
+  const total = analytics?.total_requests ?? null;
+  const reqs24h = analytics?.reqs_24h ?? 0;
+
+  return (
+    <div className="border-t border-[#22262A] pt-3 text-[13px] font-mono text-[#8A8E8C]">
+      meter
+      <span className="text-[#4F5354] mx-2">·</span>
+      {total === null ? '—' : total.toLocaleString()} paid queries all-time
+      <span className="text-[#4F5354] mx-2">·</span>
+      <span className="text-[#9DFFB5]">${settledAllTime.toFixed(2)}</span> settled in usdc
+      <span className="text-[#4F5354] mx-2">·</span>
+      $0.02 per call
+      <span className="text-[#4F5354] mx-2">·</span>
+      no key, no subscription
+      {reqs24h >= 25 && (
+        <>
+          <span className="text-[#4F5354] mx-2">·</span>
+          <span className="text-[#9DFFB5]">{reqs24h.toLocaleString()} in the last 24h</span>
+        </>
+      )}
     </div>
   );
 }

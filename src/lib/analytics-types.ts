@@ -55,3 +55,47 @@ export function coordsFor(row: RecentRow): [number, number] | null {
   const k = (row.location_query || '').toLowerCase().trim();
   return CITY_COORDS[k] ?? null;
 }
+
+// Crawled metros keyed by lowercase metro name (matches scripts/seed-metros.ts).
+// Drives the coverage layer on the homepage map.
+export const METRO_COORDS: Record<string, [number, number]> = {
+  'phoenix, az': [33.4484, -112.074],
+  'los angeles, ca': [34.0522, -118.2437],
+  'denver, co': [39.7392, -104.9903],
+  'san francisco, ca': [37.7749, -122.4194],
+  'san diego, ca': [32.7157, -117.1611],
+  'seattle, wa': [47.6062, -122.3321],
+  'portland, or': [45.5152, -122.6784],
+  'chicago, il': [41.8781, -87.6298],
+  'las vegas, nv': [36.1699, -115.1398],
+  'detroit, mi': [42.3314, -83.0458],
+  'boston, ma': [42.3601, -71.0589],
+  'sacramento, ca': [38.5816, -121.4944],
+  'tucson, az': [32.2226, -110.9747],
+};
+
+// Shape served by GET /api/crawl/status (free discovery endpoint).
+export type CrawlStatusResponse = {
+  ok: boolean;
+  schema?: { migrated: boolean; missing_columns: string[] };
+  metros?: { id: number; name: string; enabled: boolean }[];
+  stats?: {
+    total_dispensaries: string;
+    total_menu_items: string;
+    total_price_changes: string;
+    unavailable_menu_items: string;
+    failed_runs: string;
+    last_crawl: string | null;
+  };
+  recentCrawls?: {
+    id: number;
+    metro_name: string;
+    source: string;
+    status: string;
+    items_loaded: number | null;
+    items_new: number | null;
+    items_updated: number | null;
+    completed_at: string | null;
+    started_at: string;
+  }[];
+};

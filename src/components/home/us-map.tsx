@@ -1,10 +1,14 @@
 // src/components/home/us-map.tsx
-// Stylized US dot map. Pins recent calls; pings the freshest 3.
+// Coverage map: metro pins (always present — the territory we can answer
+// questions about) with live query activity layered on top only when it is
+// genuinely fresh. Stale activity is omitted, never faked.
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useAnalytics } from './use-analytics';
-import { coordsFor } from '@/lib/analytics-types';
+import { useCrawlStatus } from './use-crawl-status';
+import { coordsFor, METRO_COORDS } from '@/lib/analytics-types';
 
 function project(lat: number, lng: number) {
   const x = (lng + 125) / (125 - 66);
@@ -33,15 +37,33 @@ const grid: { x: number; y: number }[] = (() => {
   return out;
 })();
 
+const PING_WINDOW_MS = 15 * 60 * 1000; // pings: queries < 15 min old
+const DOT_WINDOW_MS = 24 * 60 * 60 * 1000; // solid dots: queries < 24h old
+
 export function UsMap() {
-  const data = useAnalytics(3000);
-  const events = (data?.recent ?? [])
-    .map((r) => ({ row: r, c: coordsFor(r) }))
-    .filter((e) => e.c)
+  const analytics = useAnalytics(5000);
+  const crawl = useCrawlStatus(60_000);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const events = (analytics?.recent ?? [])
+    .map((r) => ({ row: r, c: coordsFor(r), age: now - new Date(r.created_at).getTime() }))
+    .filter((e) => e.c && e.age < DOT_WINDOW_MS)
     .slice(0, 10);
+
+  const metros = (crawl?.metros ?? [])
+    .map((m) => ({ ...m, c: METRO_COORDS[m.name.toLowerCase()] }))
+    .filter((m) => m.c);
 
   return (
     <div className="absolute inset-0">
+      <div className="absolute top-2.5 left-3 z-10 text-[10px] font-mono text-[#4F5354] tracking-[1.4px]">
+        COVERAGE{metros.length > 0 ? ` · ${metros.filter((m) => m.enabled).length} METROS` : ''}
+      </div>
       {grid.map((g, i) => (
         <span
           key={i}
@@ -55,10 +77,40 @@ export function UsMap() {
           }}
         />
       ))}
+      {/* coverage layer: crawled metros */}
+      {metros.map((m) => {
+        const [lat, lng] = m.c!;
+        const p = project(lat, lng);
+        const name = m.name.split(',')[0].toLowerCase();
+        return (
+          <div
+            key={m.id}
+            className="absolute flex items-center gap-1"
+            style={{
+              left: `${p.x * 100}%`,
+              top: `${p.y * 100}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <span
+              className="block"
+              style={{
+                width: 5,
+                height: 5,
+                background: m.enabled ? '#7AB8FF' : '#4F5354',
+              }}
+            />
+            <span className="hidden sm:block font-mono text-[9px] text-[#4F5354] whitespace-nowrap">
+              {name}
+            </span>
+          </div>
+        );
+      })}
+      {/* activity layer: only genuinely fresh queries */}
       {events.map((e, i) => {
         const [lat, lng] = e.c!;
         const p = project(lat, lng);
-        const fresh = i < 3;
+        const live = e.age < PING_WINDOW_MS;
         return (
           <div
             key={`${e.row.created_at}-${i}`}
@@ -69,7 +121,7 @@ export function UsMap() {
               transform: 'translate(-50%, -50%)',
             }}
           >
-            {fresh && (
+            {live && (
               <span
                 className="absolute rounded-full"
                 style={{
@@ -87,10 +139,10 @@ export function UsMap() {
             <span
               className="block rounded-full"
               style={{
-                width: fresh ? 7 : 4,
-                height: fresh ? 7 : 4,
-                background: fresh ? '#9DFFB5' : '#FFB976',
-                boxShadow: fresh ? '0 0 10px #9DFFB5' : 'none',
+                width: live ? 7 : 4,
+                height: live ? 7 : 4,
+                background: live ? '#9DFFB5' : '#FFB976',
+                boxShadow: live ? '0 0 10px #9DFFB5' : 'none',
               }}
             />
           </div>
