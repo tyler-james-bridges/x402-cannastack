@@ -17,10 +17,11 @@ export const ACTIVE_NETWORK: Network =
   ACTIVE_CHAIN === 'abstract' ? ABSTRACT_NETWORK : BASE_NETWORK;
 
 // Facilitator that verifies + settles payments.
-// Base mainnet x402 settlement runs through the Coinbase CDP facilitator
-// (or any facilitator that advertises eip155:8453 in /supported).
+// Must advertise the active network in its /supported list, or @x402/next
+// throws a RouteConfigurationError at request time. payai's facilitator
+// supports exact on Base mainnet (eip155:8453); CDP works too with keys.
 export const BASE_FACILITATOR_URL =
-  process.env.X402_FACILITATOR_BASE || 'https://x402.org/facilitator';
+  process.env.X402_FACILITATOR_BASE || 'https://facilitator.payai.network';
 export const ABSTRACT_FACILITATOR_URL =
   process.env.X402_FACILITATOR_ABSTRACT || 'https://facilitator.x402.abs.xyz';
 
