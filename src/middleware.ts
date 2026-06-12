@@ -43,18 +43,29 @@ export function middleware(req: NextRequest) {
   }
 
   const api = ENDPOINT_PAGES[pathname];
-  if (api && wantsJson(req)) {
-    return NextResponse.json(
-      {
-        message: `This is a human page. Call ${api} via POST to use this endpoint as an agent.`,
-        method: 'POST',
-        api: `https://cannastack.0x402.sh${api}`,
-        docs: `https://cannastack.0x402.sh/docs#${pathname.slice(1)}`,
-        openapi: ROOT_POINTERS.openapi,
-        manifest: ROOT_POINTERS.manifest,
-      },
-      { headers: CORS_BASE },
-    );
+  if (api) {
+    // Non-GET (agents POST here) -> rewrite to the real API handler so the
+    // x402-gated route runs instead of 405-ing on the missing page route.
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const url = req.nextUrl.clone();
+      url.pathname = api;
+      return NextResponse.rewrite(url);
+    }
+
+    // GET that explicitly wants JSON -> agent landing pointer.
+    if (wantsJson(req)) {
+      return NextResponse.json(
+        {
+          message: `This is a human page. Call ${api} via POST to use this endpoint as an agent.`,
+          method: 'POST',
+          api: `https://cannastack.0x402.sh${api}`,
+          docs: `https://cannastack.0x402.sh/docs#${pathname.slice(1)}`,
+          openapi: ROOT_POINTERS.openapi,
+          manifest: ROOT_POINTERS.manifest,
+        },
+        { headers: CORS_BASE },
+      );
+    }
   }
 
   return NextResponse.next();

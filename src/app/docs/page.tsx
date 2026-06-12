@@ -94,7 +94,7 @@ export default function DocsPage() {
         <p className="text-sm text-[#8A8E8C] mt-2 leading-relaxed">
           Every endpoint is a single JSON POST. Without payment it returns HTTP 402 with payment
           requirements; route the call through an x402-capable client (the x402 fetch shim, AgentCash,
-          or any wallet that speaks x402) to settle $0.02 in USDC on Abstract and receive the data.
+          or any wallet that speaks x402) to settle $0.02 in USDC on Base and receive the data.
           The exact same URL serves both the 402 challenge and the 200 response.
         </p>
         <div className="mt-4">
@@ -103,7 +103,7 @@ curl -i -X POST ${BASE}/api/strain-finder \\
   -H 'Content-Type: application/json' \\
   -d '{"strain":"Blue Dream","location":"Denver, CO"}'
 
-# Pay + retry automatically with an x402 client (settles USDC on Abstract)`}</CodeBlock>
+# Pay + retry automatically with an x402 client (settles USDC on Base)`}</CodeBlock>
         </div>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
