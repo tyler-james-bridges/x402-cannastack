@@ -18,7 +18,7 @@ export async function GET() {
     '- Every paid endpoint is a single `POST` with JSON body. An unpaid request returns HTTP 402 with payment requirements in the `payment-required` header.',
   );
   lines.push(
-    '- Pay per request via x402 micropayments on Abstract (eip155:2741), settled in USDC. Route the call through an x402-capable client (x402 fetch shim, AgentCash, or any wallet that speaks x402). The same URL serves both 402 and 200.',
+    '- Pay per request via x402 micropayments on Base (eip155:8453), settled in USDC. Route the call through an x402-capable client (x402 fetch shim, AgentCash, or any wallet that speaks x402). The same URL serves both 402 and 200.',
   );
   lines.push('- US locations only. Provide a city name, "City, ST", or street address.');
   lines.push('- Geocoding and the underlying menu data come from Weedmaps; live-fallback kicks in when a metro is not yet in the database.');

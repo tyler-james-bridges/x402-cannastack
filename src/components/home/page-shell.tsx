@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { LiveMeter } from './live-meter';
+import { ConnectWallet } from '@/components/connect-wallet';
 
 export function PageShell({
   eyebrow,
@@ -22,6 +23,8 @@ export function PageShell({
         <span className="text-[#4F5354]">/</span>
         <span className="text-[#8A8E8C] truncate">{eyebrow}</span>
         <LiveMeter variant="strip" className="ml-auto" />
+        <span className="text-[#4F5354] hidden md:inline">│</span>
+        <ConnectWallet />
       </div>
 
       <section className="px-6 lg:px-9 py-8 border-b border-[#22262A]">

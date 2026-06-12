@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
 
 interface PricePoint {
   item_name: string;
@@ -65,6 +66,7 @@ export function PriceHistorySearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -91,8 +93,19 @@ export function PriceHistorySearch() {
     }
     if (location.trim()) payload.location = location.trim();
 
+    if (!isConnected) {
+      setError('Connect a wallet to pay $0.02 in USDC and run this search.');
+      setLoading(false);
+      return;
+    }
+    if (wrongChain || !ready || !payFetch) {
+      setError('Switch your wallet to Base to pay for this search.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/price-history', {
+      const res = await payFetch('/api/price-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -103,8 +116,12 @@ export function PriceHistorySearch() {
         return;
       }
       setResult(data);
-    } catch {
-      setError('Failed to connect');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Payment or request failed: ${err.message}`
+          : 'Failed to connect',
+      );
     } finally {
       setLoading(false);
     }

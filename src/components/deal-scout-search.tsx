@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
 
 interface DealProduct {
   name: string;
@@ -57,10 +58,20 @@ export function DealScoutSearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!location.trim()) return;
+
+    if (!isConnected) {
+      setError('Connect a wallet to pay $0.02 in USDC and run this search.');
+      return;
+    }
+    if (wrongChain || !ready || !payFetch) {
+      setError('Switch your wallet to Base to pay for this search.');
+      return;
+    }
 
     setLoading(true);
     setResult(null);
@@ -70,7 +81,7 @@ export function DealScoutSearch() {
       const body: Record<string, string> = { location: location.trim() };
       if (category) body.category = category;
 
-      const res = await fetch('/api/deal-scout', {
+      const res = await payFetch('/api/deal-scout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -81,8 +92,12 @@ export function DealScoutSearch() {
         return;
       }
       setResult(data);
-    } catch {
-      setError('Failed to connect');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Payment or request failed: ${err.message}`
+          : 'Failed to connect',
+      );
     } finally {
       setLoading(false);
     }

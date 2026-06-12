@@ -1,4 +1,11 @@
 import { ENDPOINTS } from '@/lib/endpoints';
+import {
+  ACTIVE_CHAIN,
+  ACTIVE_NETWORK,
+  ACTIVE_FACILITATOR_URL,
+  BASE_USDC,
+  ABSTRACT_USDC,
+} from '@/lib/x402';
 
 export const dynamic = 'force-static';
 
@@ -17,12 +24,12 @@ export async function GET() {
       protocol: 'x402',
       version: 2,
       scheme: 'exact',
-      network: 'eip155:2741',
-      chain: 'abstract',
+      network: ACTIVE_NETWORK,
+      chain: ACTIVE_CHAIN,
       asset: 'USDC',
-      asset_address: '0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1',
+      asset_address: ACTIVE_CHAIN === 'abstract' ? ABSTRACT_USDC : BASE_USDC,
       settlement: 'per-request',
-      facilitator: 'https://facilitator.x402.abs.xyz',
+      facilitator: ACTIVE_FACILITATOR_URL,
     },
     endpoints: ENDPOINTS.map((ep) => ({
       name: ep.name,
