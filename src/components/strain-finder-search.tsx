@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
 
 interface Match {
   name: string;
@@ -46,17 +47,27 @@ export function StrainFinderSearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!strain.trim() || !location.trim()) return;
+
+    if (!isConnected) {
+      setError('Connect a wallet to pay $0.02 in USDC and run this search.');
+      return;
+    }
+    if (wrongChain || !ready || !payFetch) {
+      setError('Switch your wallet to Base to pay for this search.');
+      return;
+    }
 
     setLoading(true);
     setResult(null);
     setError(null);
 
     try {
-      const res = await fetch('/api/strain-finder', {
+      const res = await payFetch('/api/strain-finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ strain: strain.trim(), location: location.trim() }),
@@ -67,8 +78,12 @@ export function StrainFinderSearch() {
         return;
       }
       setResult(data);
-    } catch {
-      setError('Failed to connect');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Payment or request failed: ${err.message}`
+          : 'Failed to connect',
+      );
     } finally {
       setLoading(false);
     }

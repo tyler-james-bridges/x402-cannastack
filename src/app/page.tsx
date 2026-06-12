@@ -8,6 +8,7 @@ import { EventStream } from '@/components/home/event-stream';
 import { UsMap } from '@/components/home/us-map';
 import { RateCard } from '@/components/home/rate-card';
 import { CurlSnippet } from '@/components/home/curl-snippet';
+import { ConnectWallet } from '@/components/connect-wallet';
 
 export default function Home() {
   return (
@@ -24,6 +25,8 @@ export default function Home() {
         <span className="text-[#4F5354] hidden md:inline">│</span>
         <a href="/docs" className="hidden md:inline hover:text-[#9DFFB5]">docs</a>
         <a href="https://github.com/tyler-james-bridges/x402-cannastack" className="hidden md:inline hover:text-[#9DFFB5]">github</a>
+        <span className="text-[#4F5354] hidden md:inline">│</span>
+        <ConnectWallet />
       </div>
 
       {/* HERO — prompt + live response */}
