@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
 
 type Parsed = {
   endpoint: 'strain-finder' | 'price-compare' | 'deal-scout' | 'price-history';
@@ -128,34 +129,96 @@ const HL_COLOR: Record<string, string> = {
   strain: '#9DFFB5', location: '#FFB976', price: '#9DFFB5', category: '#7AB8FF',
 };
 
+// Request lifecycle, surfaced in the response panel header so a human (or an
+// agent reading the DOM) always knows where a paid call stands.
+type RunStatus = 'idle' | 'calling' | 'paying' | 'payment-required' | 'ok' | 'error';
+
+const STATUS_LABEL: Record<RunStatus, string> = {
+  idle: 'WAITING',
+  calling: 'CALLING',
+  paying: 'PAYING · CHECK WALLET',
+  'payment-required': '402 PAYMENT REQUIRED',
+  ok: '200 OK',
+  error: 'ERROR',
+};
+
+const STATUS_COLOR: Record<RunStatus, string> = {
+  idle: '#4F5354',
+  calling: '#FFB976',
+  paying: '#FFB976',
+  'payment-required': '#FF7361',
+  ok: '#9DFFB5',
+  error: '#FF7361',
+};
+
+function paymentErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/rejected|denied|cancell?ed/i.test(message)) {
+    return 'Payment cancelled in wallet — run again to retry.';
+  }
+  if (/insufficient/i.test(message)) {
+    return 'Payment failed: insufficient USDC on Base in the connected wallet.';
+  }
+  return `Payment or request failed: ${message.slice(0, 140)}`;
+}
+
 export function HeroPrompt() {
   const [text, setText] = useState(SAMPLES[0]);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<RunStatus>('idle');
+  const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [response, setResponse] = useState<Record<string, unknown> | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   const parsed = parse(text);
+  const loading = status === 'calling' || status === 'paying';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
-    setLoading(true); setErr(null); setResponse(null);
+    setErr(null); setResponse(null); setHttpStatus(null);
+    setStatus(ready && payFetch ? 'paying' : 'calling');
     // eslint-disable-next-line react-hooks/purity -- event handler, not render; rule loses handler context across await
     const start = Date.now();
     try {
-      const res = await fetch(`/api/${parsed.endpoint}`, {
+      const init: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.params),
-      });
+      };
+      // With a wallet ready on Base, payFetch transparently answers the 402:
+      // it signs the $0.02 USDC authorization in the wallet UI and retries.
+      // Without one, fall back to a plain fetch so the paywall is visible.
+      const res = ready && payFetch
+        ? await payFetch(`/api/${parsed.endpoint}`, init)
+        : await fetch(`/api/${parsed.endpoint}`, init);
+      setHttpStatus(res.status);
+
+      if (res.status === 402) {
+        setStatus('payment-required');
+        setErr(
+          !isConnected
+            ? 'This call costs $0.02 in USDC. Connect a wallet (top right) and run again — payment happens automatically via x402.'
+            : wrongChain
+              ? 'Wallet is on the wrong network. Switch to Base (top right) and run again.'
+              : 'The server still wants payment — the wallet payment did not go through. Run again to retry.',
+        );
+        return;
+      }
+
       const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        setStatus('error');
+        setErr((data.error as string) || `Request failed (HTTP ${res.status}).`);
+        return;
+      }
       // eslint-disable-next-line react-hooks/purity -- event handler, not render
       data._client_ms = Date.now() - start;
       setResponse(data);
-    } catch {
-      setErr('Network error.');
-    } finally {
-      setLoading(false);
+      setStatus('ok');
+    } catch (error) {
+      setStatus('error');
+      setErr(paymentErrorMessage(error));
     }
   }
 
@@ -198,6 +261,23 @@ export function HeroPrompt() {
           </button>
         </form>
 
+        {/* wallet status hint — make the payment prerequisite obvious up front */}
+        {!isConnected ? (
+          <p className="mt-2.5 text-[10px] font-mono text-[#4F5354] tracking-[0.4px]">
+            wallet not connected — RUN will hit the live $0.02 paywall (HTTP 402).
+            Connect a wallet (top right) to pay automatically via x402.
+          </p>
+        ) : wrongChain ? (
+          <p className="mt-2.5 text-[10px] font-mono text-[#FFB976] tracking-[0.4px]">
+            wallet on wrong network — switch to Base (top right) to pay for runs.
+          </p>
+        ) : (
+          <p className="mt-2.5 text-[10px] font-mono text-[#4F5354] tracking-[0.4px]">
+            wallet connected on Base — RUN pays $0.02 USDC via x402; approve the
+            signature in your wallet when prompted.
+          </p>
+        )}
+
         {/* parse chips */}
         <div className={`mt-3 flex flex-wrap gap-2 text-xs font-mono transition-opacity ${parsed ? 'opacity-100' : 'opacity-25'}`}>
           {parsed && (
@@ -232,22 +312,43 @@ export function HeroPrompt() {
 
       {/* RIGHT — response panel */}
       <div className="bg-[#111315] border border-[#22262A] rounded-md overflow-hidden">
-        <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-[#22262A] bg-[#15181A] font-mono text-[11px]">
-          <span className={response ? 'text-[#9DFFB5]' : loading ? 'text-[#FFB976]' : 'text-[#4F5354]'}>
-            ● {response ? '200 OK' : loading ? 'CALLING' : 'WAITING'}
+        <div
+          className="flex items-center gap-3 px-3.5 py-2.5 border-b border-[#22262A] bg-[#15181A] font-mono text-[11px]"
+          data-run-status={status}
+        >
+          <span style={{ color: STATUS_COLOR[status] }}>
+            ● {status === 'error' && httpStatus ? `HTTP ${httpStatus}` : STATUS_LABEL[status]}
           </span>
           <span className="text-[#4F5354]">·</span>
           <span className="text-[#8A8E8C]">
             {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(parsed?.endpoint)}` : '—'}
           </span>
-          <span className="ml-auto text-[#9DFFB5]">
-            {response ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} settled` : 'pending'}
+          <span className="ml-auto" style={{ color: STATUS_COLOR[status] }}>
+            {status === 'ok'
+              ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} settled`
+              : status === 'payment-required'
+                ? `$${parsed?.cost.toFixed(2) ?? '0.02'} due`
+                : status === 'paying'
+                  ? 'authorizing…'
+                  : status === 'calling'
+                    ? 'running'
+                    : '—'}
           </span>
         </div>
 
         <div className="p-3.5 min-h-[340px] flex flex-col gap-2">
-          {err && <div className="text-xs font-mono text-[#FF7361]">{err}</div>}
-          {!response && !loading && (
+          {err && (
+            <div
+              className={`text-xs font-mono px-3 py-2.5 rounded border ${
+                status === 'payment-required'
+                  ? 'text-[#FFB976] border-[#FFB976]/30 bg-[#FFB976]/10'
+                  : 'text-[#FF7361] border-[#FF7361]/30 bg-[#FF7361]/10'
+              }`}
+            >
+              {err}
+            </div>
+          )}
+          {!response && !loading && !err && (
             <div className="text-xs font-mono text-[#4F5354]">press ↵ to run a real call against /{parsed?.endpoint ?? 'strain-finder'}.</div>
           )}
           {loading && [0,1,2,3].map((i) => (
