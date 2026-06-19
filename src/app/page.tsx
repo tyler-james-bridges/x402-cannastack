@@ -27,7 +27,7 @@ export default async function Home() {
         '@type': 'Dataset',
         name: 'cannastack — US dispensary menus, prices, and deals',
         description:
-          'Agent-native cannabis data: dispensary menus, prices, deals, and strain availability across US metros, re-crawled every 6 hours. Queryable per-call via x402 micropayments.',
+          'Agent-native cannabis data: dispensary menus, prices, deals, and strain availability across US metros, on a 6-hour refresh cycle. Queryable per-call via x402 micropayments.',
         url: BASE,
         size: `${snapshot.totalMenuItems.toLocaleString()} menu items across ${snapshot.totalDispensaries.toLocaleString()} dispensaries`,
         dateModified: snapshot.lastCrawl ?? undefined,
