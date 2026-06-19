@@ -31,7 +31,7 @@ export function IndexStats({ snapshot }: { snapshot: IndexSnapshot | null }) {
   return (
     <div>
       <div className="text-[11px] font-mono text-[#4F5354] tracking-[1.6px] mb-3">
-        INDEX · re-crawled every 6h
+        INDEX · target refresh 6h
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatCard value={snapshot?.totalMenuItems ?? null} label="menu items indexed" />
