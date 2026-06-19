@@ -1,5 +1,5 @@
-import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
+import { getDb } from '../src/lib/db';
 config({ path: '.env.local' });
 
 const METROS = [
@@ -21,13 +21,12 @@ const METROS = [
 ];
 
 async function seed() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
+  if (!process.env.DATABASE_URL) {
     console.error('DATABASE_URL is not set');
     process.exit(1);
   }
 
-  const sql = neon(databaseUrl);
+  const sql = getDb();
 
   console.log('Seeding metro areas...');
 

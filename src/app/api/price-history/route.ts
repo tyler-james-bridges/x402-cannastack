@@ -4,7 +4,10 @@ import { geocode } from '@/lib/geocode';
 import { findNearbyDispensaries } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
+import { clampInt, likePattern, MAX_QUERY_LENGTH } from '@/lib/validate';
+import { withPayment } from '@/lib/x402';
+import { nextForPriceHistory } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
@@ -30,7 +33,7 @@ function getTrend(prices: number[]): 'up' | 'down' | 'stable' {
   return 'stable';
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -38,10 +41,13 @@ export async function POST(req: NextRequest) {
     const dispensaryName = body.dispensary?.trim() || null;
     const category = body.category?.trim().toLowerCase() || null;
     const location = body.location?.trim() || null;
-    const days = Math.min(Math.max(parseInt(body.days || '30', 10) || 30, 1), 365);
+    const days = clampInt(body.days, 30, 1, 365);
 
     if (!strain && !dispensaryName) {
       return badRequest("Provide either 'strain' or 'dispensary'", 'price-history');
+    }
+    if ((strain?.length ?? 0) > MAX_QUERY_LENGTH || (dispensaryName?.length ?? 0) > MAX_QUERY_LENGTH) {
+      return badRequest(`'strain' and 'dispensary' must be at most ${MAX_QUERY_LENGTH} characters`, 'price-history');
     }
 
     // Check cache
@@ -101,7 +107,8 @@ export async function POST(req: NextRequest) {
           FROM price_history ph
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
-          WHERE mi.name ILIKE ${'%' + strain + '%'}
+          WHERE mi.name ILIKE ${likePattern(strain)}
+            AND mi.available = true
             AND mi.dispensary_id = ANY(${dispIds})
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
@@ -114,7 +121,8 @@ export async function POST(req: NextRequest) {
           FROM price_history ph
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
-          WHERE mi.name ILIKE ${'%' + strain + '%'}
+          WHERE mi.name ILIKE ${likePattern(strain)}
+            AND mi.available = true
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
           LIMIT 500
@@ -129,7 +137,8 @@ export async function POST(req: NextRequest) {
           FROM price_history ph
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
-          WHERE d.name ILIKE ${'%' + dispensaryName + '%'}
+          WHERE d.name ILIKE ${likePattern(dispensaryName)}
+            AND mi.available = true
             AND LOWER(mi.category) = ${category}
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
@@ -142,7 +151,8 @@ export async function POST(req: NextRequest) {
           FROM price_history ph
           JOIN menu_items mi ON mi.id = ph.menu_item_id
           JOIN dispensaries d ON d.id = mi.dispensary_id
-          WHERE d.name ILIKE ${'%' + dispensaryName + '%'}
+          WHERE d.name ILIKE ${likePattern(dispensaryName)}
+            AND mi.available = true
             AND ph.recorded_at > NOW() - INTERVAL '1 day' * ${days}
           ORDER BY ph.recorded_at DESC
           LIMIT 500
@@ -164,7 +174,7 @@ export async function POST(req: NextRequest) {
               Math.round(
                 ((prices[0] - prices[prices.length - 1]) / prices[prices.length - 1]) * 10000,
               ) / 100,
-            trend: getTrend(prices.reverse()),
+            trend: getTrend([...prices].reverse()),
             data_points: history.length,
           }
         : null;
@@ -201,13 +211,20 @@ export async function POST(req: NextRequest) {
       history,
       stats,
       summary,
+      next_actions: nextForPriceHistory({
+        strain,
+        dispensary: dispensaryName,
+        category,
+        location,
+      }),
       response_ms: responseMs,
     };
 
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'price-history', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'price-history');
+    return internalError(err, 'price-history');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack price-history: Historical price trends for a category in range.');

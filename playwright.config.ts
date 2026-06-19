@@ -7,6 +7,7 @@ const isDemo = process.env.PLAYWRIGHT_DEMO === '1';
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.ts',
   timeout: 30_000,
   fullyParallel: false,
   expect: { timeout: 5_000 },

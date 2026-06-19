@@ -5,37 +5,16 @@ import { findNearbyDispensaries, searchDealsInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchDeals } from '@/lib/fallback';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
+import { CATEGORY_MAP, CATEGORY_OPTIONS } from '@/lib/categories';
+import { bestPriceValue } from '@/lib/pricing';
+import { clampInt, MAX_RADIUS_MI } from '@/lib/validate';
+import { withPayment } from '@/lib/x402';
+import { nextForDealScout } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
-const CATEGORY_MAP: Record<string, string> = {
-  flower: 'flower',
-  edibles: 'edibles',
-  edible: 'edibles',
-  vape: 'vape pens',
-  vapes: 'vape pens',
-  concentrate: 'concentrates',
-  concentrates: 'concentrates',
-  'pre-roll': 'pre-rolls,pre roll,infused pre roll',
-  'pre-rolls': 'pre-rolls,pre roll,infused pre roll',
-  preroll: 'pre-rolls,pre roll,infused pre roll',
-  drink: 'drinks',
-  drinks: 'drinks',
-  tincture: 'tinctures',
-  tinctures: 'tinctures',
-  topical: 'topicals',
-  topicals: 'topicals',
-  wellness: 'wellness',
-};
-
-function bestPrice(row: Record<string, unknown>): number {
-  if (Number(row.price_unit) > 0) return Number(row.price_unit);
-  if (Number(row.price_eighth) > 0) return Number(row.price_eighth);
-  return 0;
-}
-
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -46,14 +25,14 @@ export async function POST(req: NextRequest) {
     }
 
     const categoryInput = body.category?.trim().toLowerCase() ?? null;
-    const radiusMi = Math.min(Math.max(parseInt(body.radius || '15', 10) || 15, 1), 50);
+    const radiusMi = clampInt(body.radius, 15, 1, MAX_RADIUS_MI);
 
-    let targetCategory: string | null = null;
+    let targetCategories: string[] | null = null;
     if (categoryInput) {
-      targetCategory = CATEGORY_MAP[categoryInput] ?? null;
-      if (!targetCategory) {
+      targetCategories = CATEGORY_MAP[categoryInput] ?? null;
+      if (!targetCategories) {
         return badRequest(
-          `Unknown category: "${categoryInput}". Options: flower, edibles, vape, concentrates, pre-rolls, drinks, tinctures, topicals, wellness`,
+          `Unknown category: "${categoryInput}". Options: ${CATEGORY_OPTIONS}`,
           'deal-scout',
         );
       }
@@ -88,7 +67,7 @@ export async function POST(req: NextRequest) {
     if (dispensaries.length === 0) {
       // Fallback to live Weedmaps data
       source = 'live';
-      const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategory, radiusMi);
+      const fallback = await fallbackSearchDeals(geo.lat, geo.lng, targetCategories, radiusMi);
 
       if (fallback.dispensaries.length === 0) {
         const responseMs = Date.now() - startMs;
@@ -117,7 +96,7 @@ export async function POST(req: NextRequest) {
             category: item.category || '',
             brand: item.brand || 'Unknown',
             genetics: item.genetics || 'unknown',
-            price: bestPrice(item as unknown as Record<string, unknown>),
+            price: bestPriceValue(item as unknown as Record<string, unknown>),
             orderable: item.orderable,
           }));
 
@@ -164,6 +143,11 @@ export async function POST(req: NextRequest) {
         deals_dispensaries: fallback.dealDisps.length,
         results,
         summary,
+        next_actions: nextForDealScout({
+          location,
+          category: categoryInput || undefined,
+          bestProductName: results[0]?.deal_products?.[0]?.name,
+        }),
         response_ms: responseMs,
       };
 
@@ -173,7 +157,7 @@ export async function POST(req: NextRequest) {
 
     // DB path (existing logic)
     const dispIds = dispensaries.map((d) => d.id as number);
-    const { dealDisps, items, allCount } = await searchDealsInDB(sql, dispIds, targetCategory);
+    const { dealDisps, items, allCount } = await searchDealsInDB(sql, dispIds, targetCategories);
 
     const results = dealDisps.map((disp) => {
       const dispItems = (items || [])
@@ -184,7 +168,7 @@ export async function POST(req: NextRequest) {
           category: (item.category as string) || '',
           brand: (item.brand as string) || 'Unknown',
           genetics: (item.genetics as string) || 'unknown',
-          price: bestPrice(item),
+          price: bestPriceValue(item),
           orderable: item.orderable as boolean,
         }));
 
@@ -238,13 +222,19 @@ export async function POST(req: NextRequest) {
       deals_dispensaries: dealDisps.length,
       results,
       summary,
+      next_actions: nextForDealScout({
+        location,
+        category: categoryInput || undefined,
+        bestProductName: results[0]?.deal_products?.[0]?.name,
+      }),
       response_ms: responseMs,
     };
 
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'deal-scout', source: 'database', cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'deal-scout');
+    return internalError(err, 'deal-scout');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack deal-scout: Find the best active cannabis deals in range.');

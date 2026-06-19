@@ -52,7 +52,7 @@ async function mockAnalytics(page: Page) {
         reqs_24h: 4,
         usdc_24h: 0.08,
         by_endpoint: endpointNames.map((name) => ({ endpoint: name, cnt: 1, avg_ms: 120 })),
-        top_locations: [{ location_query: 'Phoenix, AZ', cnt: 1 }],
+        top_locations: [{ location_query: 'Denver, CO', cnt: 1 }],
         top_strains: [{ strain: 'Blue Dream', cnt: 1 }],
         recent: [],
       }),
@@ -87,7 +87,7 @@ test('homepage orients humans and agents', async ({ page }) => {
 
   await expect(page.getByText('CANNASTACK').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: /Cannabis data, priced like an API call/i })).toBeVisible();
-  await expect(page.getByPlaceholder('find Blue Dream near Phoenix')).toBeVisible();
+  await expect(page.getByPlaceholder('find Blue Dream near Denver under $30')).toBeVisible();
   await expect(page.getByRole('link', { name: 'docs' }).first()).toBeVisible();
 
   for (const name of endpointNames) {
@@ -101,11 +101,11 @@ test('homepage prompt routes natural language before submit', async ({ page }) =
 
   await page.goto('/');
 
-  const prompt = page.getByPlaceholder('find Blue Dream near Phoenix');
+  const prompt = page.getByPlaceholder('find Blue Dream near Denver under $30');
   await expect(page.getByText('/strain-finder', { exact: true }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'deals near Las Vegas' }).click();
-  await expect(prompt).toHaveValue('deals near Las Vegas');
+  await page.getByRole('button', { name: 'deals near Las Vegas tonight' }).click();
+  await expect(prompt).toHaveValue('deals near Las Vegas tonight');
   await expect(page.getByText('/deal-scout', { exact: true }).first()).toBeVisible();
 
   await prompt.fill('???');
@@ -115,14 +115,18 @@ test('homepage prompt routes natural language before submit', async ({ page }) =
 test('homepage preview call renders a successful metered result', async ({ page }) => {
   await mockAnalytics(page);
   await mockEndpoint(page, 'strain-finder');
+  const strainExample = endpoint('strain-finder').example_response as {
+    results: { dispensary: string }[];
+    summary: string;
+  };
 
   await page.goto('/');
   await page.getByRole('button', { name: /RUN/i }).click();
 
   await expect(page.getByText('200 OK').first()).toBeVisible();
-  await expect(page.getByText('Zen Leaf Mesa').first()).toBeVisible();
-  await expect(page.getByText(/Searched 43 dispensaries near Phoenix/i)).toBeVisible();
-  await expect(page.getByText(/cost:/i)).toBeVisible();
+  await expect(page.getByText(strainExample.results[0].dispensary).first()).toBeVisible();
+  await expect(page.getByText(strainExample.summary)).toBeVisible();
+  await expect(page.getByText(/settled/i).first()).toBeVisible();
 });
 
 test('docs page exposes the contract and discovery links', async ({ page }) => {
@@ -142,23 +146,24 @@ test('docs page exposes the contract and discovery links', async ({ page }) => {
   }
 });
 
-test('strain finder page validates required fields and renders results', async ({ page }) => {
+test('strain finder page validates required fields and wallet prerequisite', async ({ page }) => {
   await mockAnalytics(page);
-  await mockEndpoint(page, 'strain-finder');
+  const strainRequest = endpoint('strain-finder').example_request as {
+    strain: string;
+    location: string;
+  };
 
   await page.goto('/strain-finder');
 
   const submit = page.getByRole('button', { name: /FIND/i });
   await expect(submit).toBeDisabled();
 
-  await page.getByPlaceholder('Strain name (e.g. Blue Dream)').fill('Blue Dream');
-  await page.getByPlaceholder('City or address (US only)').fill('Phoenix, AZ');
+  await page.getByPlaceholder('Strain name (e.g. Blue Dream)').fill(strainRequest.strain);
+  await page.getByPlaceholder('City or address (US only)').fill(strainRequest.location);
   await expect(submit).toBeEnabled();
   await submit.click();
 
-  await expect(page.getByText(/Found 5 matches at 5 dispensaries/i)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Zen Leaf Mesa' })).toBeVisible();
-  await expect(page.getByText(/BEST PRICE/i)).toBeVisible();
+  await expect(page.getByText('Connect a wallet to pay $0.02 in USDC and run this search.')).toBeVisible();
 });
 
 test('price history shows client-side validation errors', async ({ page }) => {
@@ -207,23 +212,14 @@ test('agent can discover payment metadata through x402 manifest', async ({ reque
   }
 });
 
-test('agent receives structured validation errors from paid endpoints', async ({ request }) => {
+test('agent receives an x402 payment challenge from paid endpoints', async ({ request }) => {
   const response = await request.post('/api/strain-finder', {
-    data: { location: 'Phoenix, AZ' },
+    data: endpoint('strain-finder').example_request,
   });
 
-  expect(response.status()).toBe(400);
-  expect(response.headers()['x-cannastack-version']).toBe('1');
-  expect(response.headers()['x-price-usdc']).toBe('0.02');
+  expect(response.status()).toBe(402);
 
-  const body = await response.json();
-  expect(body).toMatchObject({
-    ok: false,
-    endpoint: 'strain-finder',
-    error: "Missing required parameter 'strain'",
-  });
-  expect(body.docs).toContain('/docs#strain-finder');
-  expect(body.example_request).toEqual(endpoint('strain-finder').example_request);
+  expect(response.headers()['content-type']).toContain('application/json');
 });
 
 test('API preflight advertises CORS support for agent clients', async ({ request }) => {

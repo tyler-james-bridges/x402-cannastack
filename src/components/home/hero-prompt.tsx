@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
+import { PRICE_USDC } from '@/lib/analytics-types';
 
 type Parsed = {
   endpoint: 'strain-finder' | 'price-compare' | 'deal-scout' | 'price-history';
@@ -9,9 +11,13 @@ type Parsed = {
   highlights: { term: string; kind: 'strain' | 'location' | 'price' | 'category' }[];
 };
 
+// Single source of truth for per-endpoint pricing — keep the hero's RUN
+// button in sync with what the API actually charges.
 const PRICE: Record<Parsed['endpoint'], number> = {
-  'strain-finder': 0.02, 'price-compare': 0.02, 'deal-scout': 0.02,
-  'price-history': 0.02,
+  'strain-finder': PRICE_USDC['strain-finder'] ?? 0.02,
+  'price-compare': PRICE_USDC['price-compare'] ?? 0.02,
+  'deal-scout': PRICE_USDC['deal-scout'] ?? 0.02,
+  'price-history': PRICE_USDC['price-history'] ?? 0.02,
 };
 
 // Cheap regex router — covers ~80% of demo queries deterministically.
@@ -60,7 +66,17 @@ function parse(text: string): Parsed | null {
   return null;
 }
 
-type Row = { title: string; subtitle?: string; price?: number };
+type Row = { title: string; subtitle?: string; price?: number; url?: string };
+
+// Shape of the next_actions block every paid endpoint now returns: a
+// ready-to-send follow-up call so neither agents nor humans dead-end here.
+type NextAction = {
+  action: string;
+  description: string;
+  endpoint: Parsed['endpoint'];
+  body: Record<string, unknown>;
+  price_usdc: number;
+};
 
 function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint']): Row[] {
   if (endpoint === 'strain-finder' && Array.isArray(resp.results)) {
@@ -71,6 +87,7 @@ function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint'
         title: (r.dispensary as string) || '—',
         subtitle: cheapest?.name || (r.address as string) || undefined,
         price: cheapest?.price,
+        url: (r.url as string) || undefined,
       };
     });
   }
@@ -89,6 +106,7 @@ function extractRows(resp: Record<string, unknown>, endpoint?: Parsed['endpoint'
         title: (r.dispensary as string) || '—',
         subtitle: cheapest?.name || (r.address as string) || undefined,
         price: cheapest?.price,
+        url: (r.url as string) || undefined,
       };
     });
   }
@@ -116,48 +134,121 @@ function rowLabel(endpoint?: Parsed['endpoint']): string {
 }
 
 const SAMPLES = [
-  'find Blue Dream near Phoenix',
+  'find Blue Dream near Denver under $30',
   'cheapest pre-rolls in Phoenix',
-  'deals near Las Vegas',
+  'deals near Las Vegas tonight',
+  'has Gelato 42 dropped this week?',
+  'compare flower prices in Seattle',
   'find Wedding Cake in Los Angeles',
-  'has Gelato dropped this week',
 ];
 
 const HL_COLOR: Record<string, string> = {
   strain: '#9DFFB5', location: '#FFB976', price: '#9DFFB5', category: '#7AB8FF',
 };
 
+// Request lifecycle, surfaced in the response panel header so a human (or an
+// agent reading the DOM) always knows where a paid call stands.
+type RunStatus = 'idle' | 'calling' | 'paying' | 'payment-required' | 'ok' | 'error';
+
+const STATUS_LABEL: Record<RunStatus, string> = {
+  idle: 'WAITING',
+  calling: 'CALLING',
+  paying: 'PAYING · CHECK WALLET',
+  'payment-required': '402 PAYMENT REQUIRED',
+  ok: '200 OK',
+  error: 'ERROR',
+};
+
+const STATUS_COLOR: Record<RunStatus, string> = {
+  idle: '#4F5354',
+  calling: '#FFB976',
+  paying: '#FFB976',
+  'payment-required': '#FF7361',
+  ok: '#9DFFB5',
+  error: '#FF7361',
+};
+
+function paymentErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/rejected|denied|cancell?ed/i.test(message)) {
+    return 'Payment cancelled in wallet — run again to retry.';
+  }
+  if (/insufficient/i.test(message)) {
+    return 'Payment failed: insufficient USDC on Base in the connected wallet.';
+  }
+  return `Payment or request failed: ${message.slice(0, 140)}`;
+}
+
 export function HeroPrompt() {
   const [text, setText] = useState(SAMPLES[0]);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<RunStatus>('idle');
+  const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [response, setResponse] = useState<Record<string, unknown> | null>(null);
+  // The request the current response (or in-flight call) belongs to — chips
+  // from next_actions run a different endpoint than the parsed input, so the
+  // panel renders from this, not from `parsed`.
+  const [active, setActive] = useState<{ endpoint: Parsed['endpoint']; cost: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
 
   const parsed = parse(text);
+  const loading = status === 'calling' || status === 'paying';
 
-  async function run() {
-    if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
-    setLoading(true); setErr(null); setResponse(null);
+  async function execute(endpoint: Parsed['endpoint'], params: Record<string, unknown>, cost: number) {
+    setErr(null); setResponse(null); setHttpStatus(null);
+    setActive({ endpoint, cost });
+    setStatus(ready && payFetch ? 'paying' : 'calling');
+    // eslint-disable-next-line react-hooks/purity -- event handler, not render; rule loses handler context across await
     const start = Date.now();
     try {
-      const res = await fetch(`/api/${parsed.endpoint}`, {
+      const init: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.params),
-      });
-      const data = await res.json();
-      data._client_ms = Date.now() - start;
-      if (!res.ok || data.ok === false) {
-        setErr(data.error || `API returned ${res.status}`);
+        body: JSON.stringify(params),
+      };
+      // With a wallet ready on Base, payFetch transparently answers the 402:
+      // it signs the USDC authorization in the wallet UI and retries.
+      // Without one, fall back to a plain fetch so the paywall is visible.
+      const res = ready && payFetch
+        ? await payFetch(`/api/${endpoint}`, init)
+        : await fetch(`/api/${endpoint}`, init);
+      setHttpStatus(res.status);
+
+      if (res.status === 402) {
+        setStatus('payment-required');
+        setErr(
+          !isConnected
+            ? `This call costs $${cost.toFixed(2)} in USDC. Connect a wallet (top right) and run again — payment happens automatically via x402.`
+            : wrongChain
+              ? 'Wallet is on the wrong network. Switch to Base (top right) and run again.'
+              : 'The server still wants payment — the wallet payment did not go through. Run again to retry.',
+        );
         return;
       }
+
+      const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        setStatus('error');
+        setErr((data.error as string) || `Request failed (HTTP ${res.status}).`);
+        return;
+      }
+      // eslint-disable-next-line react-hooks/purity -- event handler, not render
+      data._client_ms = Date.now() - start;
       setResponse(data);
-    } catch (e: unknown) {
-      setErr((e as Error)?.message || 'Network error — check your connection and try again.');
-    } finally {
-      setLoading(false);
+      setStatus('ok');
+    } catch (error) {
+      setStatus('error');
+      setErr(paymentErrorMessage(error));
     }
   }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!parsed) { setErr('Could not parse — try a different phrasing.'); return; }
+    await execute(parsed.endpoint, parsed.params, parsed.cost);
+  }
+
+  const nextActions = (response?.next_actions as NextAction[] | undefined) ?? [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-9 items-start">
@@ -172,19 +263,19 @@ export function HeroPrompt() {
         </h1>
         <p className="text-base text-[#8A8E8C] mt-3.5 leading-relaxed max-w-[520px]">
           Every dispensary menu, price, and deal — across the US — for $0.02 a query. No keys.
-          No subscription. x402-ready, per-request pricing in USDC.
+          No subscription. Settled in USDC the moment your agent asks.
         </p>
 
         {/* prompt input */}
         <form
-          onSubmit={(e) => { e.preventDefault(); run(); }}
+          onSubmit={handleSubmit}
           className="mt-6 border border-[#22262A] bg-[#111315] rounded-md flex items-center gap-3 px-5 py-4"
         >
           <span className="font-mono text-lg text-[#9DFFB5]">›</span>
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="find Blue Dream near Phoenix"
+            placeholder="find Blue Dream near Denver under $30"
             className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
           />
           <button
@@ -197,6 +288,23 @@ export function HeroPrompt() {
             {loading ? 'RUNNING…' : `↵ RUN · $${(parsed?.cost ?? 0.02).toFixed(2)}`}
           </button>
         </form>
+
+        {/* wallet status hint — make the payment prerequisite obvious up front */}
+        {!isConnected ? (
+          <p className="mt-2.5 text-[10px] font-mono text-[#4F5354] tracking-[0.4px]">
+            wallet not connected — RUN will hit the live $0.02 paywall (HTTP 402).
+            Connect a wallet (top right) to pay automatically via x402.
+          </p>
+        ) : wrongChain ? (
+          <p className="mt-2.5 text-[10px] font-mono text-[#FFB976] tracking-[0.4px]">
+            wallet on wrong network — switch to Base (top right) to pay for runs.
+          </p>
+        ) : (
+          <p className="mt-2.5 text-[10px] font-mono text-[#4F5354] tracking-[0.4px]">
+            wallet connected on Base — RUN pays $0.02 USDC via x402; approve the
+            signature in your wallet when prompted.
+          </p>
+        )}
 
         {/* parse chips */}
         <div className={`mt-3 flex flex-wrap gap-2 text-xs font-mono transition-opacity ${parsed ? 'opacity-100' : 'opacity-25'}`}>
@@ -232,40 +340,49 @@ export function HeroPrompt() {
 
       {/* RIGHT — response panel */}
       <div className="bg-[#111315] border border-[#22262A] rounded-md overflow-hidden">
-        <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-[#22262A] bg-[#15181A] font-mono text-[11px]">
-          <span className={response ? 'text-[#9DFFB5]' : loading ? 'text-[#FFB976]' : 'text-[#4F5354]'}>
-            ● {response ? '200 OK' : loading ? 'CALLING' : 'WAITING'}
+        <div
+          className="flex items-center gap-3 px-3.5 py-2.5 border-b border-[#22262A] bg-[#15181A] font-mono text-[11px]"
+          data-run-status={status}
+        >
+          <span style={{ color: STATUS_COLOR[status] }}>
+            ● {status === 'error' && httpStatus ? `HTTP ${httpStatus}` : STATUS_LABEL[status]}
           </span>
           <span className="text-[#4F5354]">·</span>
           <span className="text-[#8A8E8C]">
-            {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(parsed?.endpoint)}` : '—'}
+            {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(active?.endpoint)}` : '—'}
           </span>
-          <span className="ml-auto text-[#9DFFB5]">
-            {response ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} metered` : 'pending'}
+          <span className="ml-auto" style={{ color: STATUS_COLOR[status] }}>
+            {status === 'ok'
+              ? `−$${(active?.cost ?? 0.02).toFixed(2)} settled`
+              : status === 'payment-required'
+                ? `$${(active?.cost ?? 0.02).toFixed(2)} due`
+                : status === 'paying'
+                  ? 'authorizing…'
+                  : status === 'calling'
+                    ? 'running'
+                    : '—'}
           </span>
         </div>
 
-        <div className="p-3.5 min-h-[340px] flex flex-col gap-2">
+        <div className="p-3.5 min-h-[160px] lg:min-h-[340px] flex flex-col gap-2">
           {err && (
-            <div className="border border-[#FF7361]/30 bg-[#FF7361]/5 rounded p-3 text-xs font-mono text-[#FF7361]">
-              <span className="text-[#FF7361]/60">error: </span>{err}
+            <div
+              className={`text-xs font-mono px-3 py-2.5 rounded border ${
+                status === 'payment-required'
+                  ? 'text-[#FFB976] border-[#FFB976]/30 bg-[#FFB976]/10'
+                  : 'text-[#FF7361] border-[#FF7361]/30 bg-[#FF7361]/10'
+              }`}
+            >
+              {err}
             </div>
           )}
           {!response && !loading && !err && (
-            <div className="text-xs font-mono text-[#4F5354]">press ENTER to run a preview call against /{parsed?.endpoint ?? 'strain-finder'}.</div>
+            <div className="text-xs font-mono text-[#4F5354]">press ↵ to run a real call against /{parsed?.endpoint ?? 'strain-finder'}.</div>
           )}
           {loading && [0,1,2,3].map((i) => (
             <div key={i} className="h-14 rounded border border-[#22262A] bg-[#15181A] animate-pulse" style={{ opacity: 1 - i * 0.18 }} />
           ))}
-          {response && extractRows(response, parsed?.endpoint).length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="text-sm font-mono text-[#4F5354]">No results found</div>
-              <div className="text-xs text-[#4F5354] mt-2 max-w-[300px]">
-                {response.summary ? String(response.summary) : 'Try a different strain, location, or category.'}
-              </div>
-            </div>
-          )}
-          {response && extractRows(response, parsed?.endpoint).slice(0, 4).map((row, i) => {
+          {response && extractRows(response, active?.endpoint).slice(0, 4).map((row, i) => {
             const best = i === 0;
             return (
               <div
@@ -281,31 +398,68 @@ export function HeroPrompt() {
               >
                 <span className="font-mono text-[11px] text-[#4F5354]">{String(i + 1).padStart(2, '0')}</span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{row.title}</div>
+                  {row.url ? (
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold truncate block hover:text-[#9DFFB5]"
+                    >
+                      {row.title} <span className="text-[#4F5354]">↗</span>
+                    </a>
+                  ) : (
+                    <div className="text-sm font-semibold truncate">{row.title}</div>
+                  )}
                   {row.subtitle ? <div className="text-[11px] text-[#8A8E8C] font-mono mt-0.5 truncate">{row.subtitle}</div> : null}
                 </div>
                 <span className="font-mono text-lg font-bold" style={{ color: best ? '#9DFFB5' : '#F1F1EE' }}>
                   {row.price ? `$${row.price}` : '—'}
                 </span>
-                <span className="font-mono text-[9px] tracking-[1.4px]" style={{ color: best ? '#9DFFB5' : '#4F5354' }}>
-                  {best && row.price ? '★ MATCH' : ''}
-                </span>
+                {best && row.url ? (
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[9px] tracking-[1.4px] text-[#9DFFB5] hover:underline"
+                  >
+                    VIEW SHOP ↗
+                  </a>
+                ) : (
+                  <span className="font-mono text-[9px] tracking-[1.4px]" style={{ color: best ? '#9DFFB5' : '#4F5354' }}>
+                    {best && row.price ? '★ MATCH' : ''}
+                  </span>
+                )}
               </div>
             );
           })}
-          {response && (
-            <div className="mt-3 pt-3 border-t border-[#22262A] flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-[#4F5354]">
-              <span>endpoint: <span className="text-[#8A8E8C]">/{parsed?.endpoint}</span></span>
-              <span>cost: <span className="text-[#9DFFB5]">${parsed?.cost.toFixed(2)}</span></span>
-              <span>source: <span className="text-[#8A8E8C]">{(response.source as string) || 'api'}</span></span>
-              <span>cache: <span className="text-[#8A8E8C]">{(response.cached as boolean) ? 'hit' : 'miss'}</span></span>
-              <span>time: <span className="text-[#8A8E8C]">{String(response._client_ms)}ms</span></span>
-              <span>mode: <span className="text-[#FFB976]">preview</span></span>
-            </div>
-          )}
           {response && response.summary ? (
             <div className="text-[11px] text-[#8A8E8C] font-mono mt-2">{response.summary as string}</div>
           ) : null}
+          {response && nextActions.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-[#22262A]">
+              <div className="text-[10px] font-mono text-[#4F5354] tracking-[1.4px] mb-2">
+                NEXT · keep digging
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {nextActions.map((a) => (
+                  <button
+                    key={a.action}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => execute(a.endpoint, a.body, a.price_usdc)}
+                    className="text-left px-3 py-2 rounded border border-[#22262A] bg-[#15181A] hover:border-[#9DFFB5]/50 hover:bg-[#142219] disabled:opacity-50 group"
+                  >
+                    <span className="text-xs text-[#F1F1EE] group-hover:text-[#9DFFB5]">
+                      {a.description}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#4F5354] ml-2">
+                      /{a.endpoint} · ${a.price_usdc.toFixed(2)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <style>{`@keyframes rowAppear { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }`}</style>

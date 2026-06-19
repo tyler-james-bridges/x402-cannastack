@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useX402Fetch } from '@/lib/use-x402-fetch';
+import { NextActionChips, readPrefill, type NextAction } from '@/components/next-actions';
 
 interface Match {
   name: string;
@@ -30,6 +32,7 @@ interface SearchResult {
   dispensaries_searched: number;
   results: DispensaryResult[];
   summary: string;
+  next_actions?: NextAction[];
 }
 
 const geneticsColor: Record<string, string> = {
@@ -46,17 +49,39 @@ export function StrainFinderSearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { payFetch, ready, wrongChain, isConnected } = useX402Fetch();
+
+  // Prefill from URL params so next_actions links land ready to run.
+  // Prefill only — running (and paying) stays a deliberate click.
+  // (Client-only URL read after mount is the documented hydration-safe
+  // pattern; the synchronous setState is intentional, hence the suppression.)
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const q = readPrefill(['strain', 'location']);
+    if (q.strain) setStrain(q.strain);
+    if (q.location) setLocation(q.location);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!strain.trim() || !location.trim()) return;
+
+    if (!isConnected) {
+      setError('Connect a wallet to pay $0.02 in USDC and run this search.');
+      return;
+    }
+    if (wrongChain || !ready || !payFetch) {
+      setError('Switch your wallet to Base to pay for this search.');
+      return;
+    }
 
     setLoading(true);
     setResult(null);
     setError(null);
 
     try {
-      const res = await fetch('/api/strain-finder', {
+      const res = await payFetch('/api/strain-finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ strain: strain.trim(), location: location.trim() }),
@@ -67,8 +92,12 @@ export function StrainFinderSearch() {
         return;
       }
       setResult(data);
-    } catch {
-      setError('Failed to connect');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Payment or request failed: ${err.message}`
+          : 'Failed to connect',
+      );
     } finally {
       setLoading(false);
     }
@@ -237,6 +266,7 @@ export function StrainFinderSearch() {
               );
             })
           )}
+          <NextActionChips actions={result.next_actions} />
         </div>
       )}
     </div>

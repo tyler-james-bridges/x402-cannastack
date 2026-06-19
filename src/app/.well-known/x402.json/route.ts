@@ -1,4 +1,11 @@
 import { ENDPOINTS } from '@/lib/endpoints';
+import {
+  ACTIVE_CHAIN,
+  ACTIVE_NETWORK,
+  ACTIVE_FACILITATOR_URL,
+  BASE_USDC,
+  ABSTRACT_USDC,
+} from '@/lib/x402';
 
 export const dynamic = 'force-static';
 
@@ -15,9 +22,14 @@ export async function GET() {
     llms_txt: `${BASE}/llms.txt`,
     payment: {
       protocol: 'x402',
+      version: 2,
+      scheme: 'exact',
+      network: ACTIVE_NETWORK,
+      chain: ACTIVE_CHAIN,
       asset: 'USDC',
-      mode: 'preview',
-      note: 'Endpoints are open-access during preview. Prices reflect intended x402 per-request cost. Settlement via @x402/next is planned.',
+      asset_address: ACTIVE_CHAIN === 'abstract' ? ABSTRACT_USDC : BASE_USDC,
+      settlement: 'per-request',
+      facilitator: ACTIVE_FACILITATOR_URL,
     },
     endpoints: ENDPOINTS.map((ep) => ({
       name: ep.name,

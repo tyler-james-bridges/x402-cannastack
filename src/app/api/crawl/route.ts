@@ -1,89 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-import { crawlMetro } from '@/lib/crawler';
-import { WeedmapsAdapter } from '@/lib/adapters/weedmaps';
-// import { LeaflyAdapter } from '@/lib/adapters/leafly';
-// Leafly adapter is ready but disabled until their public API is confirmed working.
-// Uncomment the import and the leafly crawl block below to enable.
-import type { Metro, CrawlResult } from '@/lib/types';
+import { getDb } from '@/lib/db';
+import { requireCrawlAuth } from '@/lib/crawl-auth';
+import { enqueueCrawlRuns, queueStats } from '@/lib/crawl-queue';
+import { enabledSources } from '@/lib/adapters';
+import type { Metro } from '@/lib/types';
 
-export const maxDuration = 300; // 5 min max for Vercel
+// Enqueue-only trigger: inserts pending crawl_runs rows and returns
+// immediately. Execution happens in /api/crawl/worker, which claims pending
+// runs off the queue (see docs/etl-ingestion.md).
+export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret if set
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-  }
+  const denied = requireCrawlAuth(req);
+  if (denied) return denied;
 
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     return NextResponse.json({ error: 'DATABASE_URL not configured' }, { status: 500 });
   }
 
-  const sql = neon(databaseUrl);
-  const weedmaps = new WeedmapsAdapter();
-  // const leafly = new LeaflyAdapter();
+  const sql = getDb();
 
-  // Get enabled metros
   const metros = (await sql`SELECT * FROM metros WHERE enabled = true ORDER BY id`) as Metro[];
 
   if (metros.length === 0) {
-    return NextResponse.json({ ok: true, message: 'No enabled metros', results: [] });
+    return NextResponse.json({ ok: true, message: 'No enabled metros', enqueued: [], skipped: [] });
   }
 
-  const results: CrawlResult[] = [];
-
-  for (const metro of metros) {
-    try {
-      const result = await crawlMetro(sql, metro, weedmaps);
-      results.push(result);
-    } catch (err) {
-      console.error(`Crawl failed for ${metro.name} (weedmaps):`, err);
-      results.push({
-        metroId: metro.id,
-        source: weedmaps.name,
-        dispensariesFound: 0,
-        itemsCrawled: 0,
-        itemsNew: 0,
-        itemsUpdated: 0,
-        errors: 1,
-        durationMs: 0,
-      });
-    }
-
-    // Leafly crawl - uncomment when API access is confirmed
-    // try {
-    //   const result = await crawlMetro(sql, metro, leafly);
-    //   results.push(result);
-    // } catch (err) {
-    //   console.error(`Crawl failed for ${metro.name} (leafly):`, err);
-    //   results.push({
-    //     metroId: metro.id,
-    //     source: leafly.name,
-    //     dispensariesFound: 0,
-    //     itemsCrawled: 0,
-    //     itemsNew: 0,
-    //     itemsUpdated: 0,
-    //     errors: 1,
-    //     durationMs: 0,
-    //   });
-    // }
-  }
-
-  const totalItems = results.reduce((s, r) => s + r.itemsCrawled, 0);
-  const totalNew = results.reduce((s, r) => s + r.itemsNew, 0);
-  const totalErrors = results.reduce((s, r) => s + r.errors, 0);
+  const { enqueued, skipped } = await enqueueCrawlRuns(sql, metros, enabledSources());
+  const queue = await queueStats(sql);
 
   return NextResponse.json({
     ok: true,
     metros: metros.length,
-    totalItems,
-    totalNew,
-    totalErrors,
-    results,
+    enqueued,
+    skipped,
+    queue,
+    message: `Enqueued ${enqueued.length} run(s); ${skipped.length} already pending. Worker executes them.`,
   });
 }

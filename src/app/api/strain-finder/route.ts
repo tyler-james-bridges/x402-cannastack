@@ -5,21 +5,15 @@ import { findNearbyDispensaries, searchStrainInDB } from '@/lib/queries';
 import { logRequest } from '@/lib/request-log';
 import { getCached, setCache } from '@/lib/cache';
 import { fallbackSearchStrain } from '@/lib/fallback';
-import { ok, preflight, badRequest, serverError } from '@/lib/api-response';
+import { ok, preflight, badRequest, internalError } from '@/lib/api-response';
+import { bestPriceValue } from '@/lib/pricing';
+import { clampInt, MAX_QUERY_LENGTH, MAX_RADIUS_MI } from '@/lib/validate';
+import { withPayment } from '@/lib/x402';
+import { nextForStrainFinder } from '@/lib/next-actions';
 
 export const OPTIONS = preflight;
 
-function bestPrice(row: Record<string, unknown>): number {
-  if (Number(row.price_unit) > 0) return Number(row.price_unit);
-  if (Number(row.price_eighth) > 0) return Number(row.price_eighth);
-  if (Number(row.price_gram) > 0) return Number(row.price_gram);
-  if (Number(row.price_quarter) > 0) return Number(row.price_quarter);
-  if (Number(row.price_half_ounce) > 0) return Number(row.price_half_ounce);
-  if (Number(row.price_ounce) > 0) return Number(row.price_ounce);
-  return 0;
-}
-
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const startMs = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
@@ -32,8 +26,11 @@ export async function POST(req: NextRequest) {
     if (!location) {
       return badRequest("Missing required parameter 'location'", 'strain-finder');
     }
+    if (strain.length > MAX_QUERY_LENGTH) {
+      return badRequest(`'strain' must be at most ${MAX_QUERY_LENGTH} characters`, 'strain-finder');
+    }
 
-    const radiusMi = Math.min(Math.max(parseInt(body.radius || '15', 10) || 15, 1), 50);
+    const radiusMi = clampInt(body.radius, 15, 1, MAX_RADIUS_MI);
 
     // Check cache
     const sortedParams = JSON.stringify({ location, radius: radiusMi, strain });
@@ -78,6 +75,12 @@ export async function POST(req: NextRequest) {
             dispensaries_searched: 0,
             results: [],
             summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+            next_actions: nextForStrainFinder({
+              strain,
+              location,
+              radius: radiusMi,
+              resultCount: 0,
+            }),
             response_ms: responseMs,
           },
           { endpoint: 'strain-finder', source: 'live', cache: 'miss', responseMs },
@@ -134,7 +137,7 @@ export async function POST(req: NextRequest) {
         category: (row.category as string) || '',
         brand: (row.brand as string) || 'Unknown',
         genetics: (row.genetics as string) || 'unknown',
-        price: bestPrice(row),
+        price: bestPriceValue(row),
         orderable: row.orderable as boolean,
       });
     }
@@ -183,13 +186,21 @@ export async function POST(req: NextRequest) {
       dispensaries_searched: dispCount,
       results,
       summary,
+      next_actions: nextForStrainFinder({
+        strain,
+        location,
+        radius: radiusMi,
+        resultCount: results.length,
+        topCategory: results[0]?.matches[0]?.category || undefined,
+      }),
       response_ms: responseMs,
     };
 
     setCache(cacheKey, responseData);
     return ok(responseData, { endpoint: 'strain-finder', source, cache: 'miss', responseMs });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Request failed';
-    return serverError(message, 'strain-finder');
+    return internalError(err, 'strain-finder');
   }
 }
+
+export const POST = withPayment(handler, '0.02', 'cannastack strain-finder: Search a strain across every dispensary menu within range.');

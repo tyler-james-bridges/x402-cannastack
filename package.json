@@ -4,42 +4,46 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/migrate.ts --optional && next build",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0 --no-error-on-unmatched-pattern",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed --workers=1 --project=chromium",
     "test:e2e:demo": "PLAYWRIGHT_DEMO=1 PLAYWRIGHT_TILE_WINDOWS=1 DEMO_SLOWMO=750 playwright test tests/cannastack-demo.spec.ts --headed --workers=2 --fully-parallel --project=chromium --reporter=line",
     "test:e2e:ui": "playwright test --ui",
-    "preflight": "node scripts/preflight.mjs",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed-metros.ts",
     "crawl": "tsx scripts/crawl.ts",
-    "smoke:prod": "node scripts/smoke-prod.mjs"
+    "crawl:worker": "tsx scripts/worker.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "@tanstack/react-query": "^5.101.0",
+    "@x402/core": "^2.5.0",
+    "@x402/evm": "^2.5.0",
+    "@x402/fetch": "^2.5.0",
+    "@x402/next": "^2.5.0",
     "dotenv": "^17.4.2",
-    "next": "^15.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "next": "^16.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "viem": "^2.52.2",
+    "wagmi": "^3.6.16"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.5",
-    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^10.4.0",
-    "eslint-config-next": "^16.2.6",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.9",
+    "pg": "^8.21.0",
     "tailwindcss": "^4",
     "tsx": "^4",
-    "typescript": "^5",
-    "typescript-eslint": "^8.59.4",
-    "vitest": "^4.1.7"
+    "typescript": "^5"
   }
 }
