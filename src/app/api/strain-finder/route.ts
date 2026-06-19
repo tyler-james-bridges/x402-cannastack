@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       return badRequest("Missing required parameter 'location'", 'strain-finder');
     }
 
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = Math.min(Math.max(parseInt(body.radius || '15', 10) || 15, 1), 50);
 
     // Check cache
     const sortedParams = JSON.stringify({ location, radius: radiusMi, strain });

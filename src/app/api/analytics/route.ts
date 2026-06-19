@@ -1,6 +1,6 @@
 // src/app/api/analytics/route.ts
 // Extends your existing analytics route with the two fields the homepage
-// meter + event stream need: settled USDC over the last 24h, and recent
+// meter + event stream need: metered USDC value over the last 24h, and recent
 // requests with city coordinates so the map can pin them.
 
 import { NextResponse } from 'next/server';
@@ -21,7 +21,7 @@ export async function GET() {
   try {
     const sql = getDb();
 
-    const [topEndpoints, topLocations, topStrains, recent, total, settled24h] = await Promise.all([
+    const [topEndpoints, topLocations, topStrains, recent, total, metered24h] = await Promise.all([
       sql`SELECT endpoint, count(*) as cnt, round(avg(response_ms)) as avg_ms
           FROM request_log GROUP BY endpoint ORDER BY cnt DESC`,
       sql`SELECT location_query, count(*) as cnt
@@ -39,10 +39,10 @@ export async function GET() {
       sql`SELECT count(*) as cnt FROM request_log
           WHERE created_at > now() - interval '24 hours'`,
       sql`SELECT endpoint, count(*) as cnt FROM request_log
-          WHERE created_at > now() - interval '24 hours' GROUP BY endpoint`,
+          WHERE created_at > now() - interval '24 hours' GROUP BY endpoint` /* metered24h */,
     ]);
 
-    const usdc24h = (settled24h as Array<Record<string, unknown>>).reduce(
+    const usdc24h = (metered24h as Array<Record<string, unknown>>).reduce(
       (s, r) => s + (PRICE_USDC[String(r.endpoint)] ?? 0.02) * Number(r.cnt),
       0,
     );
@@ -51,7 +51,7 @@ export async function GET() {
       {
         ok: true,
         total_requests: Number(total[0].cnt),
-        reqs_24h: (settled24h as Array<Record<string, unknown>>).reduce(
+        reqs_24h: (metered24h as Array<Record<string, unknown>>).reduce(
           (s, r) => s + Number(r.cnt),
           0,
         ),

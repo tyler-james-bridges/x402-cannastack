@@ -42,7 +42,7 @@ export function LiveMeter({
   if (variant === 'strip') {
     return (
       <span className={`text-[#8A8E8C] ${className}`}>
-        settled 24h <span className="text-[#9DFFB5]">{fmt(display)}</span>
+        metered 24h <span className="text-[#9DFFB5]">{fmt(display)}</span>
         <span className="text-[#4F5354] mx-2">·</span>
         {data ? data.reqs_24h.toLocaleString() : '—'} reqs
       </span>
@@ -52,7 +52,7 @@ export function LiveMeter({
   return (
     <div>
       <div className="text-[11px] font-mono text-[#4F5354] tracking-[1.6px]">
-        USDC SETTLED · LAST 24H
+        METERED VALUE · LAST 24H
       </div>
       <div
         className="font-mono font-medium tabular-nums leading-none mt-1.5 text-[#F1F1EE]"

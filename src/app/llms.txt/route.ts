@@ -9,7 +9,7 @@ export async function GET() {
   lines.push('# cannastack');
   lines.push('');
   lines.push(
-    '> Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability across the US, priced like an API call via x402. $0.02 per request, settled in USDC. No keys, no contracts.',
+    '> Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability across the US, priced per request via x402. Currently open-access (preview mode). $0.02 per request when payment is enabled. No keys, no contracts.',
   );
   lines.push('');
   lines.push('## How to use');
@@ -18,7 +18,7 @@ export async function GET() {
     '- Every endpoint is a single `POST` with JSON body. No auth header required for previewing.',
   );
   lines.push(
-    '- For metered access via x402 micropayments, route the request through an x402-capable client (Bankr, AgentCash, x402 fetch shim). The same URL serves both.',
+    '- When x402 payment is enabled, route requests through an x402-capable client (x402 fetch shim, Bankr, AgentCash). During preview mode, all endpoints are open-access.',
   );
   lines.push('- US locations only. Provide a city name, "City, ST", or street address.');
   lines.push('- Geocoding and the underlying menu data come from Weedmaps; live-fallback kicks in when a metro is not yet in the database.');

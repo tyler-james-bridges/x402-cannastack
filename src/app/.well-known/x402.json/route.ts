@@ -16,8 +16,8 @@ export async function GET() {
     payment: {
       protocol: 'x402',
       asset: 'USDC',
-      settlement: 'per-request',
-      gateway: 'https://x402.bankr.bot',
+      mode: 'preview',
+      note: 'Endpoints are open-access during preview. Prices reflect intended x402 per-request cost. Settlement via @x402/next is planned.',
     },
     endpoints: ENDPOINTS.map((ep) => ({
       name: ep.name,

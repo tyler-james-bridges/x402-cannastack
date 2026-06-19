@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = Math.min(Math.max(parseInt(body.radius || '15', 10) || 15, 1), 50);
     const genetics = body.genetics?.trim().toLowerCase() || null;
     const limit = Math.min(body.limit ?? 50, 100);
 

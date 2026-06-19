@@ -116,12 +116,11 @@ function rowLabel(endpoint?: Parsed['endpoint']): string {
 }
 
 const SAMPLES = [
-  'find Blue Dream near Denver under $30',
+  'find Blue Dream near Phoenix',
   'cheapest pre-rolls in Phoenix',
-  'deals near Las Vegas tonight',
-  'has Gelato 42 dropped this week?',
-  'compare flower prices in Seattle',
+  'deals near Las Vegas',
   'find Wedding Cake in Los Angeles',
+  'has Gelato dropped this week',
 ];
 
 const HL_COLOR: Record<string, string> = {
@@ -148,9 +147,13 @@ export function HeroPrompt() {
       });
       const data = await res.json();
       data._client_ms = Date.now() - start;
+      if (!res.ok || data.ok === false) {
+        setErr(data.error || `API returned ${res.status}`);
+        return;
+      }
       setResponse(data);
-    } catch (e) {
-      setErr('Network error.');
+    } catch (e: unknown) {
+      setErr((e as Error)?.message || 'Network error — check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -169,7 +172,7 @@ export function HeroPrompt() {
         </h1>
         <p className="text-base text-[#8A8E8C] mt-3.5 leading-relaxed max-w-[520px]">
           Every dispensary menu, price, and deal — across the US — for $0.02 a query. No keys.
-          No subscription. Settled in USDC the moment your agent asks.
+          No subscription. x402-ready, per-request pricing in USDC.
         </p>
 
         {/* prompt input */}
@@ -181,7 +184,7 @@ export function HeroPrompt() {
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="find Blue Dream near Denver under $30"
+            placeholder="find Blue Dream near Phoenix"
             className="flex-1 bg-transparent outline-none text-lg font-medium text-[#F1F1EE] placeholder-[#4F5354]"
           />
           <button
@@ -238,18 +241,30 @@ export function HeroPrompt() {
             {response ? `${response._client_ms}ms · ${rowCount(response)} ${rowLabel(parsed?.endpoint)}` : '—'}
           </span>
           <span className="ml-auto text-[#9DFFB5]">
-            {response ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} settled` : 'pending'}
+            {response ? `−$${parsed?.cost.toFixed(2) ?? '0.02'} metered` : 'pending'}
           </span>
         </div>
 
         <div className="p-3.5 min-h-[340px] flex flex-col gap-2">
-          {err && <div className="text-xs font-mono text-[#FF7361]">{err}</div>}
-          {!response && !loading && (
-            <div className="text-xs font-mono text-[#4F5354]">press ↵ to run a real call against /{parsed?.endpoint ?? 'strain-finder'}.</div>
+          {err && (
+            <div className="border border-[#FF7361]/30 bg-[#FF7361]/5 rounded p-3 text-xs font-mono text-[#FF7361]">
+              <span className="text-[#FF7361]/60">error: </span>{err}
+            </div>
+          )}
+          {!response && !loading && !err && (
+            <div className="text-xs font-mono text-[#4F5354]">press ENTER to run a preview call against /{parsed?.endpoint ?? 'strain-finder'}.</div>
           )}
           {loading && [0,1,2,3].map((i) => (
             <div key={i} className="h-14 rounded border border-[#22262A] bg-[#15181A] animate-pulse" style={{ opacity: 1 - i * 0.18 }} />
           ))}
+          {response && extractRows(response, parsed?.endpoint).length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="text-sm font-mono text-[#4F5354]">No results found</div>
+              <div className="text-xs text-[#4F5354] mt-2 max-w-[300px]">
+                {response.summary ? String(response.summary) : 'Try a different strain, location, or category.'}
+              </div>
+            </div>
+          )}
           {response && extractRows(response, parsed?.endpoint).slice(0, 4).map((row, i) => {
             const best = i === 0;
             return (
@@ -278,6 +293,16 @@ export function HeroPrompt() {
               </div>
             );
           })}
+          {response && (
+            <div className="mt-3 pt-3 border-t border-[#22262A] flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-[#4F5354]">
+              <span>endpoint: <span className="text-[#8A8E8C]">/{parsed?.endpoint}</span></span>
+              <span>cost: <span className="text-[#9DFFB5]">${parsed?.cost.toFixed(2)}</span></span>
+              <span>source: <span className="text-[#8A8E8C]">{(response.source as string) || 'api'}</span></span>
+              <span>cache: <span className="text-[#8A8E8C]">{(response.cached as boolean) ? 'hit' : 'miss'}</span></span>
+              <span>time: <span className="text-[#8A8E8C]">{String(response._client_ms)}ms</span></span>
+              <span>mode: <span className="text-[#FFB976]">preview</span></span>
+            </div>
+          )}
           {response && response.summary ? (
             <div className="text-[11px] text-[#8A8E8C] font-mono mt-2">{response.summary as string}</div>
           ) : null}

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const categoryInput = body.category?.trim().toLowerCase() ?? null;
-    const radiusMi = parseInt(body.radius || '15', 10) || 15;
+    const radiusMi = Math.min(Math.max(parseInt(body.radius || '15', 10) || 15, 1), 50);
 
     let targetCategory: string | null = null;
     if (categoryInput) {

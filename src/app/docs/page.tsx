@@ -87,27 +87,27 @@ export default function DocsPage() {
           <span className="text-[#9DFFB5]">no keys, no contracts.</span>
         </>
       }
-      subtitle="Every endpoint is a single POST. Pay per request in USDC via x402. Same JSON for humans, agents, and on-chain wallets."
+      subtitle="Every endpoint is a single POST. Currently open for free preview. x402-ready for per-request USDC pricing. Same JSON for humans, agents, and on-chain wallets."
     >
       <section className="pb-6 max-w-[900px]">
         <h2 className="text-xl font-semibold tracking-tight">Quick start</h2>
         <p className="text-sm text-[#8A8E8C] mt-2 leading-relaxed">
-          Open access: every endpoint accepts plain JSON POST with no auth. For metered access via the
-          x402 micropayment protocol, route the call through a wallet-capable client (Bankr, AgentCash,
-          the x402 fetch shim). The exact same endpoint serves both — the gateway settles USDC before
-          forwarding the request.
+          Open access: every endpoint accepts plain JSON POST with no auth. Currently in free preview
+          mode — all calls return real data at no cost. When x402 metering activates, route calls through
+          a wallet-capable client (Bankr, AgentCash, the x402 fetch shim) to pay per request in USDC.
+          The exact same endpoint serves both — the gateway handles payment before forwarding.
         </p>
         <div className="mt-4">
           <CodeBlock>{`# Free preview from any terminal
 curl -X POST ${BASE}/api/strain-finder \\
   -H 'Content-Type: application/json' \\
-  -d '{"strain":"Blue Dream","location":"Denver, CO"}'`}</CodeBlock>
+  -d '{"strain":"Blue Dream","location":"Phoenix, AZ"}'`}</CodeBlock>
         </div>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="border border-[#22262A] rounded p-3.5 bg-[#111315]">
             <div className="text-[11px] font-mono text-[#4F5354] tracking-[1.4px]">PRICING</div>
-            <div className="text-sm mt-1">$0.02 per request, settled in USDC. No subscriptions.</div>
+            <div className="text-sm mt-1">$0.02 per request, x402-ready. Free preview now. No subscriptions.</div>
           </div>
           <div className="border border-[#22262A] rounded p-3.5 bg-[#111315]">
             <div className="text-[11px] font-mono text-[#4F5354] tracking-[1.4px]">COVERAGE</div>

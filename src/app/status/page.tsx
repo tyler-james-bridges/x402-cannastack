@@ -127,7 +127,7 @@ export default async function StatusPage() {
             hint={`${a?.total_requests?.toLocaleString() ?? '—'} all time`}
           />
           <Card
-            label="USDC SETTLED 24H"
+            label="METERED VALUE 24H"
             value={<span className="text-[#9DFFB5]">${(a?.usdc_24h ?? 0).toFixed(2)}</span>}
             hint="at $0.02 / call"
           />
