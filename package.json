@@ -9,6 +9,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed --workers=1 --project=chromium",
+    "test:e2e:demo": "PLAYWRIGHT_DEMO=1 PLAYWRIGHT_TILE_WINDOWS=1 DEMO_SLOWMO=750 playwright test tests/cannastack-demo.spec.ts --headed --workers=2 --fully-parallel --project=chromium --reporter=line",
+    "test:e2e:ui": "playwright test --ui",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed-metros.ts",
     "crawl": "tsx scripts/crawl.ts",
@@ -29,6 +33,7 @@
     "wagmi": "^3.6.16"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
     "@types/pg": "^8.20.0",

@@ -10,3 +10,5 @@ node_modules/
 *.tsbuildinfo
 .vercel
 .data/
+playwright-report/
+test-results/
