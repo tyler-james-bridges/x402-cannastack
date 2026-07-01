@@ -58,11 +58,18 @@ async function handler(req: NextRequest) {
     let source: 'database' | 'live' = 'database';
     let matches: Record<string, unknown>[] = [];
     let dispCount = dispensaries.length;
+    let liveDispMeta = new Map<number, { distance_mi?: number; active_deal?: boolean }>();
 
     if (dispensaries.length === 0) {
       source = 'live';
       const fallback = await fallbackSearchStrain(geo.lat, geo.lng, strain, radiusMi);
       dispCount = fallback.dispensaries.length;
+      liveDispMeta = new Map(
+        fallback.dispensaries.map((d) => [
+          d.id,
+          { distance_mi: Number(d.distance_mi) || undefined, active_deal: Boolean(d.has_deals) },
+        ]),
+      );
 
       if (dispCount === 0) {
         const responseMs = Date.now() - startMs;
@@ -107,6 +114,8 @@ async function handler(req: NextRequest) {
         address: string;
         city: string;
         url: string;
+        distance_mi?: number;
+        active_deal?: boolean;
         matches: Array<{
           name: string;
           category: string;
@@ -118,8 +127,17 @@ async function handler(req: NextRequest) {
       }
     >();
 
+    const dispMeta = new Map<number, { distance_mi?: number; active_deal?: boolean }>(
+      (source === 'live' ? [] : dispensaries).map((d) => [
+        Number(d.id),
+        { distance_mi: Number(d.distance_mi) || undefined, active_deal: Boolean(d.has_deals) },
+      ]),
+    );
+    const activeDispMeta = source === 'live' ? liveDispMeta : dispMeta;
+
     for (const row of matches) {
       const dispId = row.dispensary_id as number;
+      const meta = activeDispMeta.get(dispId);
       if (!dispMap.has(dispId)) {
         dispMap.set(dispId, {
           dispensary: row.dispensary_name as string,
@@ -129,6 +147,8 @@ async function handler(req: NextRequest) {
           address: (row.dispensary_address as string) || '',
           city: (row.dispensary_city as string) || '',
           url: (row.dispensary_url as string) || '',
+          distance_mi: meta?.distance_mi,
+          active_deal: meta?.active_deal,
           matches: [],
         });
       }

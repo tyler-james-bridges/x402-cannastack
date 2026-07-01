@@ -61,6 +61,12 @@ async function handler(req: NextRequest) {
 
     const sql = getDb();
     const dispensaries = await findNearbyDispensaries(sql, geo.lat, geo.lng, radiusMi);
+    const dispMeta = new Map<number, { distance_mi?: number; active_deal?: boolean }>(
+      dispensaries.map((d) => [
+        Number(d.id),
+        { distance_mi: Number(d.distance_mi) || undefined, active_deal: Boolean(d.has_deals) },
+      ]),
+    );
 
     let source: 'database' | 'live' = 'database';
 
@@ -108,6 +114,8 @@ async function handler(req: NextRequest) {
           address: disp.address || '',
           city: disp.city || '',
           url: disp.web_url || '',
+          distance_mi: Number(disp.distance_mi) || undefined,
+          active_deal: true,
           deal_products: dispItems,
         };
       });
@@ -180,6 +188,8 @@ async function handler(req: NextRequest) {
         address: (disp.address as string) || '',
         city: (disp.city as string) || '',
         url: (disp.web_url as string) || '',
+        distance_mi: dispMeta.get(Number(disp.id))?.distance_mi,
+        active_deal: dispMeta.get(Number(disp.id))?.active_deal ?? true,
         deal_products: dispItems,
       };
     });
