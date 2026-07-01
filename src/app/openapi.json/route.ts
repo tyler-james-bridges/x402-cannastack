@@ -28,6 +28,10 @@ function buildSpec() {
         tags: ['cannastack'],
         'x-cannastack-price-usdc': ep.price_usdc,
         'x-x402-price-usdc': ep.price_usdc,
+        'x-payment-info': {
+          price: { mode: 'fixed', currency: 'USD', amount: ep.price_usdc.toFixed(6) },
+          protocols: [{ x402: {} }],
+        },
         requestBody: {
           required: true,
           content: {
@@ -77,6 +81,7 @@ function buildSpec() {
               },
             },
           },
+          '402': { description: 'Payment Required' },
         },
       },
     };
@@ -119,6 +124,8 @@ function buildSpec() {
       version: '1.0.0',
       description:
         'Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability priced like an API call via x402. $0.02 per request, settled in USDC.',
+      'x-guidance':
+        'Use POST /api/strain-finder when the agent has a strain name and location. Use POST /api/price-compare for cheapest product-category comparisons. Use POST /api/deal-scout for active deals by category or location. Payable routes use x402 on Base USDC and return chainable next_actions.',
       contact: { url: `${BASE}/docs` },
       license: { name: 'MIT' },
     },
