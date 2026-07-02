@@ -73,6 +73,8 @@ test('openapi includes x402scan registration metadata', async () => {
   const response = await openapiGET();
   const spec = await response.json();
 
+  assert.equal(spec.info.title, 'Cannastack');
+  assert.equal(spec.info.description, 'Cannabis menu data API for agents.');
   assert.equal(spec.info.contact.email, 'tylerscv22@gmail.com');
   assert.deepEqual(Object.keys(spec.paths).sort(), ENDPOINTS.map((ep) => ep.path).sort());
   assert.ok(spec.paths['/api/strain-finder'].post['x-payment-info']);

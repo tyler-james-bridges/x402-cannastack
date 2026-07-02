@@ -19,15 +19,15 @@ export const baseChain = base;
 // connector throws at runtime.
 const connectors = [
   injected({ shimDisconnect: true }),
-  coinbaseWallet({ appName: 'cannastack', preference: 'all' }),
+  coinbaseWallet({ appName: 'Cannastack', preference: 'all' }),
   ...(walletConnectProjectId
     ? [
         walletConnect({
           projectId: walletConnectProjectId,
           showQrModal: true,
           metadata: {
-            name: 'cannastack',
-            description: 'Agent-native cannabis data, $0.02 per call via x402.',
+            name: 'Cannastack',
+            description: 'Cannabis menu data API for agents.',
             url: 'https://cannastack.0x402.sh',
             icons: ['https://cannastack.0x402.sh/icon.svg'],
           },

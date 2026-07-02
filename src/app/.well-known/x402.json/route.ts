@@ -13,9 +13,8 @@ const BASE = 'https://cannastack.0x402.sh';
 
 export async function GET() {
   const manifest = {
-    name: 'cannastack',
-    description:
-      'Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability priced per request via x402.',
+    name: 'Cannastack',
+    description: 'Cannabis menu data API for agents.',
     homepage: BASE,
     docs: `${BASE}/docs`,
     openapi: `${BASE}/openapi.json`,
