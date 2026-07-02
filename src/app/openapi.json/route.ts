@@ -87,38 +87,6 @@ function buildSpec() {
     };
   }
 
-  paths['/api/analytics'] = {
-    get: {
-      operationId: 'analytics_summary',
-      summary: 'Public analytics: total requests, USDC settled 24h, top endpoints and locations.',
-      tags: ['cannastack'],
-      security: [],
-      'x-cannastack-price-usdc': 0,
-      responses: {
-        '200': {
-          description: 'Success',
-          content: { 'application/json': { schema: { type: 'object' } } },
-        },
-      },
-    },
-  };
-
-  paths['/api/crawl/status'] = {
-    get: {
-      operationId: 'crawl_status',
-      summary: 'Crawler health and recent runs across metros.',
-      tags: ['cannastack'],
-      security: [],
-      'x-cannastack-price-usdc': 0,
-      responses: {
-        '200': {
-          description: 'Success',
-          content: { 'application/json': { schema: { type: 'object' } } },
-        },
-      },
-    },
-  };
-
   return {
     openapi: '3.1.0',
     info: {
@@ -159,7 +127,7 @@ function buildSpec() {
       },
     },
     'x-x402': {
-      version: '1',
+      version: '2',
       payment: { protocol: 'x402', asset: 'USDC' },
       manifest: `${BASE}/.well-known/x402.json`,
     },

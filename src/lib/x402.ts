@@ -1,8 +1,10 @@
 import { withX402, x402ResourceServer } from '@x402/next';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
+import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
 import { NextRequest, NextResponse } from 'next/server';
+import { ENDPOINTS, type EndpointSpec } from './endpoints';
 
 // cannastack settles on Base in USDC via x402.
 // Base is the primary chain. Abstract config is retained for reference/fallback.
@@ -93,6 +95,27 @@ function getServer(): x402ResourceServer {
   return _server;
 }
 
+function endpointInputSchema(ep: EndpointSpec) {
+  const required = ep.params.filter((p) => p.required).map((p) => p.name);
+  const properties = Object.fromEntries(
+    ep.params.map((p) => [p.name, { type: p.type === 'number' ? 'number' : 'string' }]),
+  );
+
+  return { properties, ...(required.length ? { required } : {}) };
+}
+
+export function discoveryExtensionForDescription(description: string) {
+  const ep = ENDPOINTS.find((candidate) => description.includes(candidate.name));
+  if (!ep) return undefined;
+
+  return declareDiscoveryExtension({
+    bodyType: 'json',
+    input: ep.example_request,
+    inputSchema: endpointInputSchema(ep),
+    output: { example: ep.example_response, schema: { type: 'object', properties: {} } },
+  });
+}
+
 /**
  * Wrap a POST handler with x402 payment enforcement on the active chain (Base).
  * When PREVIEW_MODE is on, the handler is returned unwrapped (free).
@@ -107,6 +130,8 @@ export function withPayment(
     return handler;
   }
 
+  const extensions = discoveryExtensionForDescription(description);
+
   return withX402(
     handler,
     {
@@ -120,6 +145,7 @@ export function withPayment(
       ],
       description,
       mimeType: 'application/json',
+      ...(extensions ? { extensions } : {}),
     },
     getServer(),
   );
