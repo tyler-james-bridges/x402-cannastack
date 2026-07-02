@@ -34,7 +34,7 @@ export function middleware(req: NextRequest) {
   if (pathname === '/' && wantsJson(req)) {
     return NextResponse.json(
       {
-        name: 'cannastack',
+        name: 'Cannastack',
         message: 'Agent endpoint. See /docs for human docs, /openapi.json for machine.',
         ...ROOT_POINTERS,
       },

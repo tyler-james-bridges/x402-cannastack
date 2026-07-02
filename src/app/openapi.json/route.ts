@@ -90,10 +90,9 @@ function buildSpec() {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'cannastack',
+      title: 'Cannastack',
       version: '1.0.0',
-      description:
-        'Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability priced like an API call via x402. $0.02 per request, settled in USDC.',
+      description: 'Cannabis menu data API for agents.',
       'x-guidance':
         'Use POST /api/strain-finder when the agent has a strain name and location. Use POST /api/price-compare for cheapest product-category comparisons. Use POST /api/deal-scout for active deals by category or location. Payable routes use x402 on Base USDC and return chainable next_actions.',
       contact: { email: 'tylerscv22@gmail.com', url: `${BASE}/docs` },
