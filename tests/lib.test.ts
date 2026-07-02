@@ -6,6 +6,7 @@ import { bestPrice, bestPriceValue } from '../src/lib/pricing';
 import { CATEGORY_MAP, CATEGORY_OPTIONS } from '../src/lib/categories';
 import { PRICE_USDC } from '../src/lib/analytics-types';
 import { ENDPOINTS } from '../src/lib/endpoints';
+import { GET as openapiGET } from '../src/app/openapi.json/route';
 
 test('clampInt clamps to bounds', () => {
   assert.equal(clampInt(999999, 15, 1, MAX_RADIUS_MI), 50);
@@ -65,4 +66,15 @@ test('endpoint specs and analytics pricing agree', () => {
     );
   }
   assert.equal(Object.keys(PRICE_USDC).length, ENDPOINTS.length);
+});
+
+test('openapi includes x402scan registration metadata', async () => {
+  const response = await openapiGET();
+  const spec = await response.json();
+
+  assert.equal(spec.info.contact.email, 'tylerscv22@gmail.com');
+  assert.deepEqual(spec.paths['/api/analytics'].get.security, []);
+  assert.deepEqual(spec.paths['/api/crawl/status'].get.security, []);
+  assert.ok(spec.paths['/api/strain-finder'].post['x-payment-info']);
+  assert.ok(spec.paths['/api/strain-finder'].post.responses['402']);
 });

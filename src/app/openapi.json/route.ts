@@ -92,6 +92,7 @@ function buildSpec() {
       operationId: 'analytics_summary',
       summary: 'Public analytics: total requests, USDC settled 24h, top endpoints and locations.',
       tags: ['cannastack'],
+      security: [],
       'x-cannastack-price-usdc': 0,
       responses: {
         '200': {
@@ -107,6 +108,7 @@ function buildSpec() {
       operationId: 'crawl_status',
       summary: 'Crawler health and recent runs across metros.',
       tags: ['cannastack'],
+      security: [],
       'x-cannastack-price-usdc': 0,
       responses: {
         '200': {
@@ -126,7 +128,7 @@ function buildSpec() {
         'Agent-native cannabis data. Dispensary menus, prices, deals, and strain availability priced like an API call via x402. $0.02 per request, settled in USDC.',
       'x-guidance':
         'Use POST /api/strain-finder when the agent has a strain name and location. Use POST /api/price-compare for cheapest product-category comparisons. Use POST /api/deal-scout for active deals by category or location. Payable routes use x402 on Base USDC and return chainable next_actions.',
-      contact: { url: `${BASE}/docs` },
+      contact: { email: 'tylerscv22@gmail.com', url: `${BASE}/docs` },
       license: { name: 'MIT' },
     },
     servers: [{ url: BASE }],
