@@ -7,6 +7,7 @@ import { CATEGORY_MAP, CATEGORY_OPTIONS } from '../src/lib/categories';
 import { PRICE_USDC } from '../src/lib/analytics-types';
 import { ENDPOINTS } from '../src/lib/endpoints';
 import { GET as openapiGET } from '../src/app/openapi.json/route';
+import { discoveryExtensionForDescription } from '../src/lib/x402';
 
 test('clampInt clamps to bounds', () => {
   assert.equal(clampInt(999999, 15, 1, MAX_RADIUS_MI), 50);
@@ -73,8 +74,17 @@ test('openapi includes x402scan registration metadata', async () => {
   const spec = await response.json();
 
   assert.equal(spec.info.contact.email, 'tylerscv22@gmail.com');
-  assert.deepEqual(spec.paths['/api/analytics'].get.security, []);
-  assert.deepEqual(spec.paths['/api/crawl/status'].get.security, []);
+  assert.deepEqual(Object.keys(spec.paths).sort(), ENDPOINTS.map((ep) => ep.path).sort());
   assert.ok(spec.paths['/api/strain-finder'].post['x-payment-info']);
   assert.ok(spec.paths['/api/strain-finder'].post.responses['402']);
+  assert.equal(spec.paths['/api/analytics'], undefined);
+  assert.equal(spec.paths['/api/crawl/status'], undefined);
+});
+
+test('x402 payment requirements include runtime discovery schemas', () => {
+  for (const ep of ENDPOINTS) {
+    const extension = discoveryExtensionForDescription(`cannastack ${ep.name}: test`);
+    assert.ok(extension?.bazaar?.schema.properties.input, `${ep.name} missing input schema`);
+    assert.ok(extension?.bazaar?.schema.properties.output, `${ep.name} missing output schema`);
+  }
 });
