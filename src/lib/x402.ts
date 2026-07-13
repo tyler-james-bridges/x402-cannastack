@@ -1,7 +1,10 @@
 import { withX402, x402ResourceServer } from '@x402/next';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
-import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
+import {
+  bazaarResourceServerExtension,
+  declareDiscoveryExtension,
+} from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
 import { NextRequest, NextResponse } from 'next/server';
 import { ENDPOINTS, type EndpointSpec } from './endpoints';
@@ -86,11 +89,13 @@ function makeScheme() {
   return scheme;
 }
 
-function getServer(): x402ResourceServer {
+export function getServer(): x402ResourceServer {
   if (!_server) {
     _server = new x402ResourceServer(
       new HTTPFacilitatorClient({ url: ACTIVE_FACILITATOR_URL }),
-    ).register(ACTIVE_NETWORK, makeScheme());
+    )
+      .register(ACTIVE_NETWORK, makeScheme())
+      .registerExtension(bazaarResourceServerExtension);
   }
   return _server;
 }

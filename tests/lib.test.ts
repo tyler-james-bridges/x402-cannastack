@@ -7,7 +7,7 @@ import { CATEGORY_MAP, CATEGORY_OPTIONS } from '../src/lib/categories';
 import { PRICE_USDC } from '../src/lib/analytics-types';
 import { ENDPOINTS } from '../src/lib/endpoints';
 import { GET as openapiGET } from '../src/app/openapi.json/route';
-import { discoveryExtensionForDescription } from '../src/lib/x402';
+import { discoveryExtensionForDescription, getServer } from '../src/lib/x402';
 
 test('clampInt clamps to bounds', () => {
   assert.equal(clampInt(999999, 15, 1, MAX_RADIUS_MI), 50);
@@ -89,4 +89,8 @@ test('x402 payment requirements include runtime discovery schemas', () => {
     assert.ok(extension?.bazaar?.schema.properties.input, `${ep.name} missing input schema`);
     assert.ok(extension?.bazaar?.schema.properties.output, `${ep.name} missing output schema`);
   }
+});
+
+test('x402 server registers the Bazaar extension before handling payments', () => {
+  assert.equal(getServer().hasExtension('bazaar'), true);
 });
