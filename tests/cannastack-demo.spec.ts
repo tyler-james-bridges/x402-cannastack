@@ -2,6 +2,7 @@ import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { ENDPOINTS } from '../src/lib/endpoints';
 
 const endpointNames = ['strain-finder', 'price-compare', 'deal-scout', 'price-history'] as const;
+const settlementTransaction = `0x${'12'.repeat(32)}`;
 
 async function tileDemoWindow(page: Page, workerIndex: number) {
   if (process.env.PLAYWRIGHT_TILE_WINDOWS !== '1') return;
@@ -74,6 +75,13 @@ async function mockEndpoint(page: Page, name: (typeof endpointNames)[number]) {
       headers: {
         'x-cannastack-version': '1',
         'x-price-usdc': spec.price_usdc.toFixed(2),
+        'payment-response': Buffer.from(
+          JSON.stringify({
+            success: true,
+            transaction: settlementTransaction,
+            network: 'eip155:8453',
+          }),
+        ).toString('base64'),
       },
       body: JSON.stringify(spec.example_response),
     });
@@ -127,6 +135,26 @@ test('homepage preview call renders a successful metered result', async ({ page 
   await expect(page.getByText(strainExample.results[0].dispensary).first()).toBeVisible();
   await expect(page.getByText(strainExample.summary)).toBeVisible();
   await expect(page.getByText(/settled/i).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /PAYMENT SETTLED/i })).toHaveAttribute(
+    'href',
+    `https://basescan.org/tx/${settlementTransaction}`,
+  );
+});
+
+test('homepage result chains into the next paid endpoint', async ({ page }) => {
+  await mockAnalytics(page);
+  await mockEndpoint(page, 'strain-finder');
+  await mockEndpoint(page, 'price-history');
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /RUN/i }).click();
+  await page.getByRole('button', { name: /30-day price history/i }).click();
+
+  const history = endpoint('price-history').example_response as {
+    history: { item_name: string }[];
+  };
+  await expect(page.getByText(history.history[0].item_name).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /PAYMENT SETTLED/i })).toBeVisible();
 });
 
 test('docs page exposes the contract and discovery links', async ({ page }) => {
@@ -185,7 +213,7 @@ test('agent can discover endpoint contracts through OpenAPI', async ({ request }
 
   const spec = await response.json();
   expect(spec.openapi).toBe('3.1.0');
-  expect(spec.info.title).toBe('cannastack');
+  expect(spec.info.title).toBe('Cannastack');
   expect(spec['x-x402'].payment.protocol).toBe('x402');
 
   for (const name of endpointNames) {
@@ -200,7 +228,7 @@ test('agent can discover payment metadata through x402 manifest', async ({ reque
   expect(response.ok()).toBeTruthy();
 
   const manifest = await response.json();
-  expect(manifest.name).toBe('cannastack');
+  expect(manifest.name).toBe('Cannastack');
   expect(manifest.payment.protocol).toBe('x402');
   expect(manifest.endpoints).toHaveLength(4);
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { decodePaymentResponseHeader } from '@x402/fetch';
 import { useX402Fetch } from '@/lib/use-x402-fetch';
 import { PRICE_USDC } from '@/lib/analytics-types';
 
@@ -67,6 +68,7 @@ function parse(text: string): Parsed | null {
 }
 
 type Row = { title: string; subtitle?: string; price?: number; url?: string };
+type Settlement = { transaction: string; network: string };
 
 // Shape of the next_actions block every paid endpoint now returns: a
 // ready-to-send follow-up call so neither agents nor humans dead-end here.
@@ -179,11 +181,27 @@ function paymentErrorMessage(err: unknown): string {
   return `Payment or request failed: ${message.slice(0, 140)}`;
 }
 
+function settlementFromResponse(response: Response): Settlement | null {
+  const paymentResponse =
+    response.headers.get('payment-response') ?? response.headers.get('x-payment-response');
+  if (!paymentResponse) return null;
+
+  try {
+    const decoded = decodePaymentResponseHeader(paymentResponse);
+    return decoded.success && decoded.transaction
+      ? { transaction: decoded.transaction, network: decoded.network }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function HeroPrompt() {
   const [text, setText] = useState(SAMPLES[0]);
   const [status, setStatus] = useState<RunStatus>('idle');
   const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [response, setResponse] = useState<Record<string, unknown> | null>(null);
+  const [settlement, setSettlement] = useState<Settlement | null>(null);
   // The request the current response (or in-flight call) belongs to — chips
   // from next_actions run a different endpoint than the parsed input, so the
   // panel renders from this, not from `parsed`.
@@ -195,7 +213,7 @@ export function HeroPrompt() {
   const loading = status === 'calling' || status === 'paying';
 
   async function execute(endpoint: Parsed['endpoint'], params: Record<string, unknown>, cost: number) {
-    setErr(null); setResponse(null); setHttpStatus(null);
+    setErr(null); setResponse(null); setSettlement(null); setHttpStatus(null);
     setActive({ endpoint, cost });
     setStatus(ready && payFetch ? 'paying' : 'calling');
     // eslint-disable-next-line react-hooks/purity -- event handler, not render; rule loses handler context across await
@@ -213,6 +231,7 @@ export function HeroPrompt() {
         ? await payFetch(`/api/${endpoint}`, init)
         : await fetch(`/api/${endpoint}`, init);
       setHttpStatus(res.status);
+      setSettlement(settlementFromResponse(res));
 
       if (res.status === 402) {
         setStatus('payment-required');
@@ -249,6 +268,9 @@ export function HeroPrompt() {
   }
 
   const nextActions = (response?.next_actions as NextAction[] | undefined) ?? [];
+  const settlementUrl = settlement
+    ? `${settlement.network === 'eip155:2741' ? 'https://abscan.org' : 'https://basescan.org'}/tx/${settlement.transaction}`
+    : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-9 items-start">
@@ -435,6 +457,21 @@ export function HeroPrompt() {
           {response && response.summary ? (
             <div className="text-[11px] text-[#8A8E8C] font-mono mt-2">{response.summary as string}</div>
           ) : null}
+          {response && settlement && settlementUrl && (
+            <a
+              href={settlementUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded border border-[#9DFFB5]/30 bg-[#9DFFB5]/5 px-3 py-2 font-mono hover:border-[#9DFFB5]/60"
+            >
+              <span className="text-[10px] tracking-[1.4px] text-[#9DFFB5]">
+                PAYMENT SETTLED
+              </span>
+              <span className="text-[10px] text-[#8A8E8C]">
+                {settlement.transaction.slice(0, 10)}...{settlement.transaction.slice(-6)}
+              </span>
+            </a>
+          )}
           {response && nextActions.length > 0 && (
             <div className="mt-3 pt-3 border-t border-[#22262A]">
               <div className="text-[10px] font-mono text-[#4F5354] tracking-[1.4px] mb-2">
