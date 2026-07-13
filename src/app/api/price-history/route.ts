@@ -89,6 +89,11 @@ async function handler(req: NextRequest) {
             history: [],
             stats: null,
             summary: `No dispensaries found near ${location}. This area may not be crawled yet.`,
+            next_actions: nextForPriceHistory({
+              strain,
+              dispensary: dispensaryName,
+              category,
+            }),
             response_ms: responseMs,
           },
           { endpoint: 'price-history', source: 'database', cache: 'miss', responseMs },

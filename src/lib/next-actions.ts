@@ -106,6 +106,12 @@ export function nextForPriceCompare(input: {
         'strain-finder',
         clean({ strain: cheapestName, location }),
       ),
+      act(
+        'price-history',
+        `See the 30-day price trend for "${cheapestName}" near ${location}.`,
+        'price-history',
+        clean({ strain: cheapestName, category, location, days: 30 }),
+      ),
     );
   }
   actions.push(
@@ -114,12 +120,6 @@ export function nextForPriceCompare(input: {
       `See ${category} deals near ${location}.`,
       'deal-scout',
       clean({ location, category }),
-    ),
-    act(
-      'price-history',
-      `30-day ${category} price trend near ${location}.`,
-      'price-history',
-      clean({ category, location, days: 30 }),
     ),
   );
   return actions;
@@ -141,6 +141,12 @@ export function nextForDealScout(input: {
         'strain-finder',
         clean({ strain: bestProductName, location }),
       ),
+      act(
+        'price-history',
+        `See the 30-day price trend for "${bestProductName}" near ${location}.`,
+        'price-history',
+        clean({ strain: bestProductName, category, location, days: 30 }),
+      ),
     );
   }
   actions.push(
@@ -149,12 +155,6 @@ export function nextForDealScout(input: {
       `Compare ${category || 'flower'} prices near ${location} to see how good these deals are.`,
       'price-compare',
       clean({ category: category || 'flower', location }),
-    ),
-    act(
-      'price-history',
-      `30-day ${category || 'flower'} price trend near ${location}.`,
-      'price-history',
-      clean({ category: category || 'flower', location, days: 30 }),
     ),
   );
   return actions;
@@ -195,13 +195,14 @@ export function nextForPriceHistory(input: {
       ),
     );
   }
-  if (dispensary && !location) {
+  if (!location && (strain || dispensary)) {
+    const subject = strain ? `"${strain}"` : dispensary;
     actions.push(
       act(
-        'dispensary-trend',
-        `Longer view: 90-day price history for ${dispensary}.`,
+        strain ? 'strain-trend' : 'dispensary-trend',
+        `Longer view: 90-day price history for ${subject}.`,
         'price-history',
-        clean({ dispensary, days: 90 }),
+        clean({ strain, dispensary, category, days: 90 }),
       ),
     );
   }

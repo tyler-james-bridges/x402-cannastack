@@ -87,6 +87,10 @@ async function handler(req: NextRequest) {
             deals_dispensaries: 0,
             results: [],
             summary: `No dispensaries found within ${radiusMi} miles of ${location}.`,
+            next_actions: nextForDealScout({
+              location,
+              category: categoryInput || undefined,
+            }),
             response_ms: responseMs,
           },
           { endpoint: 'deal-scout', source: 'live', cache: 'miss', responseMs },
