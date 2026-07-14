@@ -1,5 +1,6 @@
 import { withX402, x402ResourceServer } from '@x402/next';
 import { HTTPFacilitatorClient } from '@x402/core/server';
+import { decodePaymentRequiredHeader } from '@x402/core/http';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import {
   bazaarResourceServerExtension,
@@ -122,6 +123,36 @@ export function discoveryExtensionForDescription(description: string) {
 }
 
 /**
+ * Mirror the v2 PAYMENT-REQUIRED header into the JSON response body.
+ *
+ * The x402 SDK treats the header as canonical and otherwise emits `{}` for API
+ * clients. Some agent clients discover payment requirements from the 402 body,
+ * so returning both representations keeps those clients interoperable while
+ * preserving the standard header for SDK-based clients.
+ */
+export function withPaymentRequiredBody(response: NextResponse): NextResponse {
+  if (response.status !== 402) return response;
+
+  const encodedChallenge = response.headers.get('payment-required');
+  if (!encodedChallenge) return response;
+
+  try {
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+
+    return NextResponse.json(decodePaymentRequiredHeader(encodedChallenge), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    // Leave malformed/non-v2 responses untouched rather than masking the
+    // original payment error with a challenge-decoding failure.
+    return response;
+  }
+}
+
+/**
  * Wrap a POST handler with x402 payment enforcement on the active chain (Base).
  * When PREVIEW_MODE is on, the handler is returned unwrapped (free).
  */
@@ -137,7 +168,7 @@ export function withPayment(
 
   const extensions = discoveryExtensionForDescription(description);
 
-  return withX402(
+  const paymentHandler = withX402(
     handler,
     {
       accepts: [
@@ -154,4 +185,7 @@ export function withPayment(
     },
     getServer(),
   );
+
+  return async (request: NextRequest) =>
+    withPaymentRequiredBody(await paymentHandler(request));
 }

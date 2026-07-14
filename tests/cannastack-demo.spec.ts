@@ -1,4 +1,5 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { decodePaymentRequiredHeader } from '@x402/core/http';
 import { ENDPOINTS } from '../src/lib/endpoints';
 
 const endpointNames = ['strain-finder', 'price-compare', 'deal-scout', 'price-history'] as const;
@@ -240,14 +241,39 @@ test('agent can discover payment metadata through x402 manifest', async ({ reque
   }
 });
 
-test('agent receives an x402 payment challenge from paid endpoints', async ({ request }) => {
-  const response = await request.post('/api/strain-finder', {
-    data: endpoint('strain-finder').example_request,
-  });
+test('agent receives a complete x402 payment challenge from every paid endpoint', async ({
+  request,
+}) => {
+  for (const name of endpointNames) {
+    const ep = endpoint(name);
+    const response = await request.post(ep.path, { data: ep.example_request });
 
-  expect(response.status()).toBe(402);
+    expect(response.status()).toBe(402);
+    expect(response.headers()['content-type']).toContain('application/json');
 
-  expect(response.headers()['content-type']).toContain('application/json');
+    const encodedChallenge = response.headers()['payment-required'];
+    expect(encodedChallenge).toBeTruthy();
+
+    const headerChallenge = decodePaymentRequiredHeader(encodedChallenge);
+    const bodyChallenge = await response.json();
+    expect(bodyChallenge).toEqual(headerChallenge);
+    expect(bodyChallenge).toMatchObject({
+      x402Version: 2,
+      resource: {
+        url: expect.stringContaining(ep.path),
+        mimeType: 'application/json',
+      },
+      accepts: [
+        {
+          scheme: 'exact',
+          network: 'eip155:8453',
+          amount: '20000',
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          payTo: expect.stringMatching(/^0x[0-9a-fA-F]{40}$/),
+        },
+      ],
+    });
+  }
 });
 
 test('API preflight advertises CORS support for agent clients', async ({ request }) => {

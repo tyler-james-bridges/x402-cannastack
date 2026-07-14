@@ -7,7 +7,12 @@ import { CATEGORY_MAP, CATEGORY_OPTIONS } from '../src/lib/categories';
 import { PRICE_USDC } from '../src/lib/analytics-types';
 import { ENDPOINTS } from '../src/lib/endpoints';
 import { GET as openapiGET } from '../src/app/openapi.json/route';
-import { discoveryExtensionForDescription, getServer } from '../src/lib/x402';
+import {
+  discoveryExtensionForDescription,
+  getServer,
+  withPaymentRequiredBody,
+} from '../src/lib/x402';
+import { NextResponse } from 'next/server';
 
 test('clampInt clamps to bounds', () => {
   assert.equal(clampInt(999999, 15, 1, MAX_RADIUS_MI), 50);
@@ -93,4 +98,37 @@ test('x402 payment requirements include runtime discovery schemas', () => {
 
 test('x402 server registers the Bazaar extension before handling payments', () => {
   assert.equal(getServer().hasExtension('bazaar'), true);
+});
+
+test('x402 payment challenge is returned in both the header and JSON body', async () => {
+  const challenge = {
+    x402Version: 2,
+    error: 'Payment required',
+    resource: {
+      url: 'https://cannastack.0x402.sh/api/strain-finder',
+      description: 'Search dispensary menus.',
+      mimeType: 'application/json',
+    },
+    accepts: [
+      {
+        scheme: 'exact',
+        network: 'eip155:8453',
+        amount: '20000',
+        asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        payTo: '0x668aDd9213985E7Fd613Aec87767C892f4b9dF1c',
+        maxTimeoutSeconds: 300,
+      },
+    ],
+  };
+  const encodedChallenge = Buffer.from(JSON.stringify(challenge)).toString('base64');
+  const sdkResponse = NextResponse.json(
+    {},
+    { status: 402, headers: { 'payment-required': encodedChallenge } },
+  );
+
+  const response = withPaymentRequiredBody(sdkResponse);
+
+  assert.equal(response.status, 402);
+  assert.equal(response.headers.get('payment-required'), encodedChallenge);
+  assert.deepEqual(await response.json(), challenge);
 });
