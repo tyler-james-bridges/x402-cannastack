@@ -8,7 +8,7 @@
  *
  * Speaks the subset of the protocol the driver uses for single queries
  * (raw-text output, array mode). Batch/transaction queries are not supported.
- * Dev/test tool only — never expose this or use it in production.
+ * Dev/test tool only. Never expose this or use it in production.
  */
 import http from 'node:http';
 import { Pool, type PoolConfig } from 'pg';

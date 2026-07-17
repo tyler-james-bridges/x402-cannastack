@@ -1,25 +1,8 @@
-import { PageShell } from '@/components/home/page-shell';
-import { StrainFinderSearch } from '@/components/strain-finder-search';
+import { RetiredEndpointPage } from '@/components/retired-endpoint';
 
 export const metadata = {
-  title: 'Strain Finder',
-  description:
-    'Find which dispensaries near you carry a specific strain. Cross-dispensary search sorted by price.',
+  title: 'Data endpoint retired',
+  description: 'This Cannastack data endpoint is retired.',
 };
 
-export default function StrainFinderPage() {
-  return (
-    <PageShell
-      eyebrow="strain-finder · $0.02"
-      title={
-        <>
-          Find a strain across<br />
-          <span className="text-[#9DFFB5]">every menu nearby.</span>
-        </>
-      }
-      subtitle="Search a strain across every dispensary menu in range. Sorted cheapest first. US locations only."
-    >
-      <StrainFinderSearch />
-    </PageShell>
-  );
-}
+export default RetiredEndpointPage;

@@ -1,134 +1,132 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { NextRequest, NextResponse } from 'next/server';
 
-import { clampInt, likePattern, MAX_RADIUS_MI, MAX_RESULT_LIMIT } from '../src/lib/validate';
-import { bestPrice, bestPriceValue } from '../src/lib/pricing';
-import { CATEGORY_MAP, CATEGORY_OPTIONS } from '../src/lib/categories';
-import { PRICE_USDC } from '../src/lib/analytics-types';
-import { ENDPOINTS } from '../src/lib/endpoints';
+import { GET as manifestGET } from '../src/app/.well-known/x402.json/route';
+import { POST as retiredDealScout } from '../src/app/api/deal-scout/route';
+import { POST as retiredPriceCompare } from '../src/app/api/price-compare/route';
+import { POST as retiredPriceHistory } from '../src/app/api/price-history/route';
+import { POST as retiredStrainFinder } from '../src/app/api/strain-finder/route';
+import { GET as llmsGET } from '../src/app/llms.txt/route';
 import { GET as openapiGET } from '../src/app/openapi.json/route';
-import {
-  discoveryExtensionForDescription,
-  getServer,
-  withPaymentRequiredBody,
-} from '../src/lib/x402';
-import { NextResponse } from 'next/server';
+import { ENDPOINTS, findEndpoint, RETIREMENT_MESSAGE } from '../src/lib/endpoints';
+import { withPaymentRequiredBody } from '../src/lib/x402';
+import { proxy } from '../src/proxy';
 
-test('clampInt clamps to bounds', () => {
-  assert.equal(clampInt(999999, 15, 1, MAX_RADIUS_MI), 50);
-  assert.equal(clampInt(-5, 15, 1, MAX_RADIUS_MI), 1);
-  assert.equal(clampInt(25, 15, 1, MAX_RADIUS_MI), 25);
+const retiredApiPaths = [
+  '/api/strain-finder',
+  '/api/price-compare',
+  '/api/deal-scout',
+  '/api/price-history',
+];
+
+const retiredHandlers = [
+  retiredStrainFinder,
+  retiredPriceCompare,
+  retiredDealScout,
+  retiredPriceHistory,
+];
+
+test('active endpoint catalog is empty', () => {
+  assert.deepEqual(ENDPOINTS, []);
+  assert.equal(findEndpoint('unavailable'), undefined);
 });
 
-test('clampInt falls back on garbage input', () => {
-  assert.equal(clampInt(undefined, 15, 1, 50), 15);
-  assert.equal(clampInt('abc', 50, 1, MAX_RESULT_LIMIT), 50);
-  assert.equal(clampInt(NaN, 30, 1, 365), 30);
-  assert.equal(clampInt(null, 15, 1, 50), 15);
+test('OpenAPI truthfully exposes no active data paths', async () => {
+  const spec = await (await openapiGET()).json();
+
+  assert.equal(spec.info.description, RETIREMENT_MESSAGE);
+  assert.deepEqual(spec.paths, {});
+  assert.equal(spec['x-service-status'].status, 'retired');
+  assert.equal(spec['x-service-status'].activePaidDataEndpoints, 0);
+  assert.equal(spec['x-x402'].status, 'inactive');
 });
 
-test('clampInt accepts numeric strings and truncates floats', () => {
-  assert.equal(clampInt('20', 15, 1, 50), 20);
-  assert.equal(clampInt(12.9, 15, 1, 50), 12);
+test('x402 manifest has no offers or endpoint examples', async () => {
+  const manifest = await (await manifestGET()).json();
+
+  assert.equal(manifest.status, 'retired');
+  assert.equal(manifest.active_paid_data_endpoints, 0);
+  assert.deepEqual(manifest.endpoints, []);
+  assert.deepEqual(manifest.payment, { protocol: 'x402', status: 'inactive' });
 });
 
-test('likePattern wraps input and escapes ILIKE metacharacters', () => {
-  assert.equal(likePattern('Blue Dream'), '%Blue Dream%');
-  assert.equal(likePattern('100%'), '%100\\%%');
-  assert.equal(likePattern('a_b'), '%a\\_b%');
-  assert.equal(likePattern('a\\b'), '%a\\\\b%');
+test('llms.txt describes only the retired state', async () => {
+  const text = await (await llmsGET()).text();
+
+  assert.match(text, /Active paid data endpoints: 0/);
+  assert.match(text, /HTTP 410 Gone/);
+  assert.doesNotMatch(text, /Example request|curl -X|\$0\.02/);
 });
 
-test('bestPrice walks the unit ladder in order', () => {
-  assert.deepEqual(bestPrice({ price_unit: 10, price_eighth: 5 }), { price: 10, unit: 'unit' });
-  assert.deepEqual(bestPrice({ price_unit: null, price_eighth: '28' }), {
-    price: 28,
-    unit: 'eighth',
+test('root JSON reports zero active paid data endpoints', async () => {
+  const request = new NextRequest('https://cannastack.0x402.sh/', {
+    headers: { accept: 'application/json' },
   });
-  assert.deepEqual(bestPrice({ price_ounce: 120 }), { price: 120, unit: 'ounce' });
-  assert.deepEqual(bestPrice({}), { price: 0, unit: 'unknown' });
+  const response = proxy(request);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.status, 'retired');
+  assert.equal(body.active_paid_data_endpoints, 0);
+  assert.deepEqual(body.endpoints, []);
 });
 
-test('bestPrice ignores zero, negative, and non-numeric values', () => {
-  assert.deepEqual(bestPrice({ price_unit: 0, price_eighth: -3, price_gram: 'n/a' }), {
-    price: 0,
-    unit: 'unknown',
-  });
-  assert.equal(bestPriceValue({ price_unit: 0, price_gram: 12 }), 12);
-});
-
-test('every advertised category option resolves in CATEGORY_MAP', () => {
-  for (const option of CATEGORY_OPTIONS.split(',').map((s) => s.trim())) {
-    assert.ok(CATEGORY_MAP[option], `option "${option}" missing from CATEGORY_MAP`);
-  }
-});
-
-test('endpoint specs and analytics pricing agree', () => {
-  for (const ep of ENDPOINTS) {
-    assert.equal(
-      PRICE_USDC[ep.name],
-      ep.price_usdc,
-      `PRICE_USDC and ENDPOINTS disagree for ${ep.name}`,
+test('legacy API requests return 410 without a payment challenge', async () => {
+  for (const path of retiredApiPaths) {
+    const response = proxy(
+      new NextRequest(`https://cannastack.0x402.sh${path}`, { method: 'POST' }),
     );
-  }
-  assert.equal(Object.keys(PRICE_USDC).length, ENDPOINTS.length);
-});
+    const body = await response.json();
 
-test('openapi includes x402scan registration metadata', async () => {
-  const response = await openapiGET();
-  const spec = await response.json();
-
-  assert.equal(spec.info.title, 'Cannastack');
-  assert.equal(spec.info.description, 'Cannabis menu data API for agents.');
-  assert.equal(spec.info.contact.email, 'tylerscv22@gmail.com');
-  assert.deepEqual(Object.keys(spec.paths).sort(), ENDPOINTS.map((ep) => ep.path).sort());
-  assert.ok(spec.paths['/api/strain-finder'].post['x-payment-info']);
-  assert.ok(spec.paths['/api/strain-finder'].post.responses['402']);
-  assert.equal(spec.paths['/api/analytics'], undefined);
-  assert.equal(spec.paths['/api/crawl/status'], undefined);
-});
-
-test('x402 payment requirements include runtime discovery schemas', () => {
-  for (const ep of ENDPOINTS) {
-    const extension = discoveryExtensionForDescription(`cannastack ${ep.name}: test`);
-    assert.ok(extension?.bazaar?.schema.properties.input, `${ep.name} missing input schema`);
-    assert.ok(extension?.bazaar?.schema.properties.output, `${ep.name} missing output schema`);
+    assert.equal(response.status, 410, path);
+    assert.equal(response.headers.has('payment-required'), false, path);
+    assert.equal(body.status, 'retired', path);
   }
 });
 
-test('x402 server registers the Bazaar extension before handling payments', () => {
-  assert.equal(getServer().hasExtension('bazaar'), true);
+test('legacy API preflights remain browser-readable', () => {
+  const response = proxy(
+    new NextRequest('https://cannastack.0x402.sh/api/strain-finder', {
+      method: 'OPTIONS',
+    }),
+  );
+
+  assert.equal(response.status, 204);
+  assert.match(response.headers.get('access-control-allow-methods') ?? '', /POST/);
 });
 
-test('x402 payment challenge is returned in both the header and JSON body', async () => {
+test('legacy route handlers directly return 410 without a payment challenge', async () => {
+  for (const handler of retiredHandlers) {
+    const response = handler();
+    assert.equal(response.status, 410);
+    assert.equal(response.headers.has('payment-required'), false);
+  }
+});
+
+test('generic x402 infrastructure exports no product discovery helper', async () => {
+  const x402 = await import('../src/lib/x402');
+  assert.equal('discoveryExtensionForDescription' in x402, false);
+});
+
+test('generic payment challenges can still be mirrored into JSON', async () => {
   const challenge = {
     x402Version: 2,
     error: 'Payment required',
     resource: {
-      url: 'https://cannastack.0x402.sh/api/strain-finder',
-      description: 'Search dispensary menus.',
+      url: 'https://example.test/resource',
+      description: 'Generic paid resource',
       mimeType: 'application/json',
     },
-    accepts: [
-      {
-        scheme: 'exact',
-        network: 'eip155:8453',
-        amount: '20000',
-        asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        payTo: '0x668aDd9213985E7Fd613Aec87767C892f4b9dF1c',
-        maxTimeoutSeconds: 300,
-      },
-    ],
+    accepts: [],
   };
-  const encodedChallenge = Buffer.from(JSON.stringify(challenge)).toString('base64');
+  const encoded = Buffer.from(JSON.stringify(challenge)).toString('base64');
   const sdkResponse = NextResponse.json(
     {},
-    { status: 402, headers: { 'payment-required': encodedChallenge } },
+    { status: 402, headers: { 'payment-required': encoded } },
   );
 
   const response = withPaymentRequiredBody(sdkResponse);
-
-  assert.equal(response.status, 402);
-  assert.equal(response.headers.get('payment-required'), encodedChallenge);
+  assert.equal(response.headers.get('payment-required'), encoded);
   assert.deepEqual(await response.json(), challenge);
 });

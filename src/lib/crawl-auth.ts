@@ -11,7 +11,7 @@ function authorized(req: NextRequest, cronSecret: string): boolean {
 /**
  * Crawl trigger/worker auth shared by /api/crawl and /api/crawl/worker.
  * Returns an error response to send, or null when the request is authorized.
- * Crawls are expensive (hammer source APIs) — never run them unauthenticated.
+ * Crawls are expensive, so never run them unauthenticated.
  */
 export function requireCrawlAuth(req: NextRequest): NextResponse | null {
   const cronSecret = process.env.CRON_SECRET;
