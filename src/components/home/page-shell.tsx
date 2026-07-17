@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import { LiveMeter } from './live-meter';
-import { ConnectWallet } from '@/components/connect-wallet';
 
 export function PageShell({
   eyebrow,
@@ -14,36 +12,38 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#0B0C0D] text-[#F1F1EE] font-sans overflow-x-clip">
-      <div className="flex items-center gap-4 px-6 py-3 border-b border-[#22262A] text-xs font-mono">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-wide hover:text-[#9DFFB5]">
-          <span className="w-2.5 h-2.5 bg-[#9DFFB5] rounded-sm shadow-[0_0_12px_#9DFFB5]" />
-          CANNASTACK
-        </Link>
-        <span className="text-[#4F5354]">/</span>
-        <span className="text-[#8A8E8C] truncate">{eyebrow}</span>
-        <LiveMeter variant="strip" className="ml-auto hidden md:inline" />
-        <span className="text-[#4F5354] hidden md:inline">│</span>
-        <ConnectWallet className="ml-auto md:ml-0" />
+    <main className="relative min-h-svh overflow-hidden bg-[#0B0C0D] text-[#F1F1EE]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(circle_at_75%_0%,rgba(157,255,181,0.12),transparent_52%)]" />
+      <header className="relative border-b border-[#22262A]">
+        <div className="mx-auto flex max-w-6xl items-center px-5 py-4 sm:px-8">
+          <Link href="/" className="flex items-center gap-2.5 font-mono text-xs font-bold tracking-[0.16em]">
+            <span className="h-2.5 w-2.5 rounded-sm bg-[#9DFFB5]" />
+            CANNASTACK
+          </Link>
+          <nav className="ml-auto flex gap-5 font-mono text-xs text-[#A2A6A4]">
+            <Link href="/docs" className="transition-colors hover:text-[#9DFFB5]">Docs</Link>
+            <Link href="/status" className="transition-colors hover:text-[#9DFFB5]">Status</Link>
+          </nav>
+        </div>
+      </header>
+
+      <div className="relative mx-auto max-w-6xl px-5 sm:px-8">
+        <section className="max-w-3xl border-l border-[#314036] py-14 pl-5 sm:py-20 sm:pl-8">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#9DFFB5]">{eyebrow}</p>
+          <h1 className="mt-5 text-4xl font-semibold leading-[1.04] tracking-[-0.035em] sm:text-6xl">
+            {title}
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-[#A2A6A4] sm:text-lg">{subtitle}</p>
+        </section>
+
+        <section className="border-t border-[#22262A] py-8 sm:py-10">{children}</section>
       </div>
 
-      <section className="px-6 lg:px-9 py-8 border-b border-[#22262A]">
-        <Link
-          href="/"
-          className="text-[11px] font-mono text-[#4F5354] tracking-[1.4px] hover:text-[#9DFFB5]"
-        >
-          ← BACK
-        </Link>
-        <h1 className="text-[36px] lg:text-[44px] font-semibold leading-[1.04] tracking-[-1px] mt-3">
-          {title}
-        </h1>
-        <p className="text-base text-[#8A8E8C] mt-3 leading-relaxed max-w-[640px]">{subtitle}</p>
-      </section>
-
-      <section className="px-6 lg:px-9 py-7">{children}</section>
-
-      <footer className="px-6 lg:px-9 py-6 border-t border-[#22262A] text-xs font-mono text-[#4F5354] flex flex-wrap gap-4">
-        <span>cannastack · public cannabis data, priced like an API call</span>
+      <footer className="relative mt-10 border-t border-[#22262A]">
+        <div className="mx-auto flex max-w-6xl flex-wrap gap-3 px-5 py-6 font-mono text-[11px] text-[#686D6A] sm:px-8">
+          <span>Cannastack</span>
+          <span className="ml-auto">0 active paid data endpoints</span>
+        </div>
       </footer>
     </main>
   );

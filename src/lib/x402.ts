@@ -2,20 +2,14 @@ import { withX402, x402ResourceServer } from '@x402/next';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
-import {
-  bazaarResourceServerExtension,
-  declareDiscoveryExtension,
-} from '@x402/extensions/bazaar';
 import type { Network } from '@x402/core/types';
 import { NextRequest, NextResponse } from 'next/server';
-import { ENDPOINTS, type EndpointSpec } from './endpoints';
 
-// cannastack settles on Base in USDC via x402.
-// Base is the primary chain. Abstract config is retained for reference/fallback.
+// Generic settlement defaults to Base USDC. Abstract remains configurable.
 export const BASE_NETWORK: Network = 'eip155:8453';
 export const ABSTRACT_NETWORK: Network = 'eip155:2741';
 
-// Active settlement network. Override with X402_NETWORK ("base" | "abstract").
+// Configured settlement network. Override with X402_NETWORK ("base" | "abstract").
 export const ACTIVE_CHAIN: 'base' | 'abstract' =
   process.env.X402_NETWORK === 'abstract' ? 'abstract' : 'base';
 
@@ -47,14 +41,13 @@ const DEFAULT_PAY_TO = (
   '0x668aDd9213985E7Fd613Aec87767C892f4b9dF1c'
 ).trim();
 
-// Free-preview master switch. When true, all gating is bypassed (legacy preview).
-// Default: metering ON. Set X402_PREVIEW_MODE=1 to serve everything free.
+// Optional bypass for callers that attach this wrapper to a resource.
 export const PREVIEW_MODE =
   process.env.X402_PREVIEW_MODE === '1' || process.env.X402_PREVIEW_MODE === 'true';
 
 if (PREVIEW_MODE) {
   console.warn(
-    '[x402] X402_PREVIEW_MODE is on — all paid endpoints are served FREE. Unset it to restore metering.',
+    '[x402] X402_PREVIEW_MODE is on; payment enforcement is disabled.',
   );
 }
 
@@ -94,32 +87,9 @@ export function getServer(): x402ResourceServer {
   if (!_server) {
     _server = new x402ResourceServer(
       new HTTPFacilitatorClient({ url: ACTIVE_FACILITATOR_URL }),
-    )
-      .register(ACTIVE_NETWORK, makeScheme())
-      .registerExtension(bazaarResourceServerExtension);
+    ).register(ACTIVE_NETWORK, makeScheme());
   }
   return _server;
-}
-
-function endpointInputSchema(ep: EndpointSpec) {
-  const required = ep.params.filter((p) => p.required).map((p) => p.name);
-  const properties = Object.fromEntries(
-    ep.params.map((p) => [p.name, { type: p.type === 'number' ? 'number' : 'string' }]),
-  );
-
-  return { properties, ...(required.length ? { required } : {}) };
-}
-
-export function discoveryExtensionForDescription(description: string) {
-  const ep = ENDPOINTS.find((candidate) => description.includes(candidate.name));
-  if (!ep) return undefined;
-
-  return declareDiscoveryExtension({
-    bodyType: 'json',
-    input: ep.example_request,
-    inputSchema: endpointInputSchema(ep),
-    output: { example: ep.example_response, schema: { type: 'object', properties: {} } },
-  });
 }
 
 /**
@@ -166,8 +136,6 @@ export function withPayment(
     return handler;
   }
 
-  const extensions = discoveryExtensionForDescription(description);
-
   const paymentHandler = withX402(
     handler,
     {
@@ -181,7 +149,6 @@ export function withPayment(
       ],
       description,
       mimeType: 'application/json',
-      ...(extensions ? { extensions } : {}),
     },
     getServer(),
   );

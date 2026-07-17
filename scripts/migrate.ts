@@ -14,7 +14,7 @@ async function migrate() {
 
   if (!process.env.DATABASE_URL) {
     if (optional) {
-      console.warn('migrate: DATABASE_URL not set — skipping (--optional)');
+      console.warn('migrate: DATABASE_URL not set, skipping (--optional)');
       return;
     }
     console.error('DATABASE_URL is not set');

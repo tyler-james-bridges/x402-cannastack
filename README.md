@@ -1,48 +1,21 @@
-# x402-cannastack
+# Cannastack
 
-Agent-native cannabis data platform. Dispensary menus, prices, deals, and strain availability served through x402 micropayment endpoints.
+Cannastack's public cannabis data service is retired pending an authorized provider.
 
-## What is this?
+## Current state
 
-The enterprise cannabis data market starts at $500/month. We're building the same data layer at $0.02/request with zero API keys, zero contracts, and instant access via the x402 payment protocol.
+- Active paid data endpoints: 0
+- Legacy data routes: HTTP 410 Gone
+- x402 challenges on retired routes: disabled
+- Third-party menu, listing, and price data: unavailable
 
-**Endpoints in this app** (served at [cannastack.0x402.sh](https://cannastack.0x402.sh), paid via x402 on Abstract):
+The public discovery surfaces all report this same inactive state:
 
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `strain-finder` | $0.02 | Cross-dispensary strain search |
-| `price-compare` | $0.02 | Category price comparison across dispensaries |
-| `deal-scout` | $0.02 | Find dispensaries with active deals |
-| `price-history` | $0.02 | Price trends over time for a strain or dispensary |
+- `/openapi.json` contains an empty `paths` object.
+- `/.well-known/x402.json` contains an empty `endpoints` array.
+- `/llms.txt` describes the retirement state without request examples.
 
-Related endpoints hosted separately on [Bankr Cloud](https://x402.bankr.bot) (not part of this codebase): `weedmaps-recs` ($0.03) and `night-out` ($0.05).
-
-## Architecture
-
-```
-Vercel Cron (every 6h)
-       |
-   ETL Crawler
-       |
-       |
-   Weedmaps
-       |
-  Neon Postgres
-       |
-  +----+----+----+
-  |    |         |
- API  Web UI   Bankr
-```
-
-**Data sources:** Weedmaps public API (live). New sources implement `DataSourceAdapter` and register in `src/lib/adapters/index.ts`. (A Leafly adapter was removed in June 2026 because its public API access was never confirmed — see git history if it's ever worth revisiting.)
-
-**Stack:** Next.js, Neon Postgres, Vercel, Tailwind, x402/Bankr Cloud.
-
-The crawler now follows a staged ETL shape: setup, extract, transform, load, and
-cleanup. Each run is recorded in `crawl_runs`, per-item load/validation outcomes
-are written to `crawl_item_events`, and stale items from completed dispensary
-crawls are marked unavailable instead of silently lingering in search results.
-See [docs/etl-ingestion.md](docs/etl-ingestion.md).
+Generic x402 payment infrastructure remains in the repository. It is not attached to a discoverable paid resource.
 
 ## Development
 
@@ -51,27 +24,7 @@ npm install
 npm run dev
 ```
 
-## Web Preview
-
-Live at [cannastack.0x402.sh](https://cannastack.0x402.sh). Agent discovery surfaces: [/llms.txt](https://cannastack.0x402.sh/llms.txt), [/openapi.json](https://cannastack.0x402.sh/openapi.json), [/.well-known/x402.json](https://cannastack.0x402.sh/.well-known/x402.json).
-
-## x402 API Usage
-
-No API keys needed. Pay per request with USDC via x402.
-
-```bash
-# Find Blue Dream near Phoenix
-bankr x402 call https://x402.bankr.bot/0x72e45a93491a6acfd02da6ceb71a903f3d3b6d08/strain-finder \
-  -d '{"strain": "Blue Dream", "location": "Phoenix, AZ"}'
-
-# Compare flower prices near Denver
-bankr x402 call https://x402.bankr.bot/0x72e45a93491a6acfd02da6ceb71a903f3d3b6d08/price-compare \
-  -d '{"category": "flower", "location": "Denver, CO"}'
-
-# Find dispensary deals near LA
-bankr x402 call https://x402.bankr.bot/0x72e45a93491a6acfd02da6ceb71a903f3d3b6d08/deal-scout \
-  -d '{"location": "Los Angeles, CA"}'
-```
+Use `npm run typecheck`, `npm test`, and `npm run test:e2e` for verification.
 
 ## License
 

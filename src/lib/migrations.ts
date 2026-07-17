@@ -88,9 +88,7 @@ export async function runMigrations(sql: Sql) {
   await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS raw_payload JSONB`;
   await sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
 
-  // Durable ETL run state. Doubles as the work queue: /api/crawl enqueues
-  // status='pending' rows; the worker claims them (claimed_at, attempts) and
-  // executes. See docs/etl-ingestion.md.
+  // Durable ETL run state retained for a future authorized provider.
   await sql`
     CREATE TABLE IF NOT EXISTS crawl_runs (
       id SERIAL PRIMARY KEY,

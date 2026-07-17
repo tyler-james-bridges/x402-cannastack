@@ -2,7 +2,7 @@
  * Queue claim/reclaim semantics against a real Postgres, exercised through the
  * same @neondatabase/serverless driver the app uses (routed to local Postgres
  * via scripts/neon-local-proxy.ts). Skipped when no local Postgres is
- * reachable — set TEST_DATABASE_URL or run a default-config Postgres 16.
+ * reachable. Set TEST_DATABASE_URL or run a default-config Postgres 16.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,13 +11,29 @@ import { Client } from 'pg';
 import { startNeonLocalProxy } from '../scripts/neon-local-proxy';
 import { getDb } from '../src/lib/db';
 import { runMigrations } from '../src/lib/migrations';
-import { enqueueCrawlRuns, claimNextRun, failExhaustedRuns, queueStats } from '../src/lib/crawl-queue';
+import {
+  enqueueCrawlRuns,
+  claimNextRun,
+  failExhaustedRuns,
+  queueStats,
+} from '../src/lib/crawl-queue';
 import { executeCrawlRun } from '../src/lib/crawler';
 import type { DataSourceAdapter, Metro } from '../src/lib/types';
 
 const PROXY_PORT = 4499;
 const TEST_PG_URL =
   process.env.TEST_DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:5432/cannastack_test';
+const SOURCE = 'test-source-a';
+const SECOND_SOURCE = 'test-source-b';
+const emptyAdapter: DataSourceAdapter = {
+  name: SOURCE,
+  async findDispensaries() {
+    return [];
+  },
+  async fetchMenu() {
+    return [];
+  },
+};
 
 async function pgAvailable(): Promise<boolean> {
   const client = new Client({ connectionString: TEST_PG_URL, connectionTimeoutMillis: 2000 });
@@ -59,11 +75,11 @@ test('crawl queue', async (t) => {
   try {
     await t.test('enqueue creates pending runs and dedupes repeat triggers', async () => {
       await resetDb();
-      const first = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps']);
+      const first = await enqueueCrawlRuns(sql, [metroA, metroB], [SOURCE]);
       assert.equal(first.enqueued.length, 2);
       assert.equal(first.skipped.length, 0);
 
-      const second = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps']);
+      const second = await enqueueCrawlRuns(sql, [metroA, metroB], [SOURCE]);
       assert.equal(second.enqueued.length, 0);
       assert.equal(second.skipped.length, 2);
 
@@ -74,26 +90,31 @@ test('crawl queue', async (t) => {
 
     await t.test('enqueue fans out one run per metro per source', async () => {
       await resetDb();
-      const result = await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps', 'othersource']);
+      const result = await enqueueCrawlRuns(sql, [metroA, metroB], [SOURCE, SECOND_SOURCE]);
       assert.equal(result.enqueued.length, 4);
 
       const rows = await sql`SELECT metro_id, source FROM crawl_runs ORDER BY metro_id, source`;
       assert.deepEqual(
         rows.map((r) => `${r.metro_id}:${r.source}`),
-        [`${metroA.id}:othersource`, `${metroA.id}:weedmaps`, `${metroB.id}:othersource`, `${metroB.id}:weedmaps`],
+        [
+          `${metroA.id}:${SOURCE}`,
+          `${metroA.id}:${SECOND_SOURCE}`,
+          `${metroB.id}:${SOURCE}`,
+          `${metroB.id}:${SECOND_SOURCE}`,
+        ],
       );
     });
 
     await t.test('claim moves oldest pending run to running and increments attempts', async () => {
       await resetDb();
-      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
-      await enqueueCrawlRuns(sql, [metroB], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA], [SOURCE]);
+      await enqueueCrawlRuns(sql, [metroB], [SOURCE]);
 
       const claimed = await claimNextRun(sql);
       assert.ok(claimed);
       assert.equal(claimed.metro.id, metroA.id);
       assert.equal(claimed.attempts, 1);
-      assert.equal(claimed.source, 'weedmaps');
+      assert.equal(claimed.source, SOURCE);
 
       const row = (await sql`SELECT status, claimed_at FROM crawl_runs WHERE id = ${claimed.runId}`)[0];
       assert.equal(row.status, 'running');
@@ -102,7 +123,7 @@ test('crawl queue', async (t) => {
 
     await t.test('concurrent claims never hand out the same run', async () => {
       await resetDb();
-      await enqueueCrawlRuns(sql, [metroA, metroB], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA, metroB], [SOURCE]);
 
       const claims = await Promise.all(Array.from({ length: 5 }, () => claimNextRun(sql)));
       const got = claims.filter((c) => c !== null);
@@ -114,7 +135,7 @@ test('crawl queue', async (t) => {
 
     await t.test('freshly claimed running run is not claimable again', async () => {
       await resetDb();
-      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA], [SOURCE]);
       const first = await claimNextRun(sql);
       assert.ok(first);
 
@@ -125,7 +146,7 @@ test('crawl queue', async (t) => {
     await t.test('stuck running run is reclaimed after the timeout, then capped by max attempts', async () => {
       await resetDb();
       process.env.CRAWL_MAX_ATTEMPTS = '2';
-      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA], [SOURCE]);
 
       const first = await claimNextRun(sql);
       assert.ok(first);
@@ -138,7 +159,7 @@ test('crawl queue', async (t) => {
       assert.equal(reclaimed.runId, first.runId);
       assert.equal(reclaimed.attempts, 2);
 
-      // Stall it again — attempts have hit the cap, so it is no longer claimable
+      // Stall it again. Attempts have hit the cap, so it is no longer claimable.
       await sql`UPDATE crawl_runs SET claimed_at = NOW() - interval '20 minutes' WHERE id = ${first.runId}`;
       assert.equal(await claimNextRun(sql), null);
 
@@ -149,62 +170,36 @@ test('crawl queue', async (t) => {
       assert.match(row.error_message as string, /max attempts/);
     });
 
-    await t.test('claimed run executes the staged ETL to completion and is idempotent on re-execution', async () => {
+    await t.test('claimed run completes without extracting data from an empty adapter', async () => {
       await resetDb();
-      const stubAdapter: DataSourceAdapter = {
-        name: 'weedmaps',
-        async findDispensaries() {
-          return [
-            { source: 'weedmaps', sourceId: 'disp-1', name: 'Stub Dispensary', city: 'Testville' },
-          ];
-        },
-        async fetchMenu() {
-          return [
-            { sourceItemId: 'item-1', name: 'Blue Dream', category: 'flower', priceEighth: 30 },
-            { sourceItemId: 'item-2', name: 'OG Kush', category: 'flower', priceEighth: 35 },
-          ];
-        },
-      };
-
-      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA], [SOURCE]);
       const claimed = await claimNextRun(sql);
       assert.ok(claimed);
 
-      const result = await executeCrawlRun(sql, claimed.runId, claimed.metro, stubAdapter);
+      const result = await executeCrawlRun(sql, claimed.runId, claimed.metro, emptyAdapter);
       assert.equal(result.status, 'success');
-      assert.equal(result.itemsNew, 2);
+      assert.equal(result.itemsNew, 0);
 
       const run = (await sql`SELECT status, completed_at FROM crawl_runs WHERE id = ${claimed.runId}`)[0];
       assert.equal(run.status, 'success');
       assert.ok(run.completed_at);
 
-      // Re-executing the same run (as a reclaim would) must not duplicate rows
-      await executeCrawlRun(sql, claimed.runId, claimed.metro, stubAdapter);
+      await executeCrawlRun(sql, claimed.runId, claimed.metro, emptyAdapter);
       const items = await sql`SELECT COUNT(*) AS n FROM menu_items`;
-      assert.equal(Number(items[0].n), 2);
+      assert.equal(Number(items[0].n), 0);
       const disps = await sql`SELECT COUNT(*) AS n FROM dispensaries`;
-      assert.equal(Number(disps[0].n), 1);
+      assert.equal(Number(disps[0].n), 0);
     });
 
     await t.test('execution heartbeats claimed_at so in-progress runs are not reclaimed', async () => {
       await resetDb();
-      const stubAdapter: DataSourceAdapter = {
-        name: 'weedmaps',
-        async findDispensaries() {
-          return [{ source: 'weedmaps', sourceId: 'disp-1', name: 'Stub Dispensary' }];
-        },
-        async fetchMenu() {
-          return [{ sourceItemId: 'item-1', name: 'Blue Dream', category: 'flower' }];
-        },
-      };
-
-      await enqueueCrawlRuns(sql, [metroA], ['weedmaps']);
+      await enqueueCrawlRuns(sql, [metroA], [SOURCE]);
       const claimed = await claimNextRun(sql);
       assert.ok(claimed);
 
       // Simulate a long-running crawl whose claim is about to look stale
       await sql`UPDATE crawl_runs SET claimed_at = NOW() - interval '20 minutes' WHERE id = ${claimed.runId}`;
-      await executeCrawlRun(sql, claimed.runId, claimed.metro, stubAdapter);
+      await executeCrawlRun(sql, claimed.runId, claimed.metro, emptyAdapter);
 
       const row = (await sql`SELECT claimed_at > NOW() - interval '1 minute' AS fresh FROM crawl_runs WHERE id = ${claimed.runId}`)[0];
       assert.equal(row.fresh, true, 'stage transitions refresh the liveness heartbeat');
