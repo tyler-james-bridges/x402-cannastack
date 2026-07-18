@@ -4,18 +4,23 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL('https://cannastack.0x402.sh'),
   title: {
-    default: 'Cannastack | Data service retired',
+    default: 'Cannastack | Bring your own menu',
     template: '%s | Cannastack',
   },
-  description: 'Cannastack data endpoints are retired pending an authorized provider.',
+  description:
+    'Source-neutral normalization, comparison, and ranking for caller-supplied menu snapshots.',
   openGraph: {
-    title: 'Cannastack | Data service retired',
-    description: 'No paid data products are active.',
+    title: 'Cannastack | Bring your own menu',
+    description: 'Process caller-supplied menu snapshots through three x402 endpoints.',
     url: 'https://cannastack.0x402.sh',
     siteName: 'cannastack',
     type: 'website',
   },
-  twitter: { card: 'summary', title: 'Cannastack', description: 'Data service retired.' },
+  twitter: {
+    card: 'summary',
+    title: 'Cannastack',
+    description: 'Source-neutral processing for caller-supplied menu snapshots.',
+  },
   icons: { icon: '/icon.svg' },
 };
 
