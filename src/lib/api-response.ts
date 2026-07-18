@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { RETIREMENT_MESSAGE } from '@/lib/endpoints';
+import { ENDPOINTS, RETIREMENT_MESSAGE } from '@/lib/endpoints';
 
 const CORS_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, HEAD, POST, OPTIONS',
   'access-control-allow-headers':
     'content-type, authorization, payment-signature, x-payment, x-x402-payment',
   'access-control-expose-headers':
@@ -12,8 +11,21 @@ const CORS_HEADERS: Record<string, string> = {
   'access-control-max-age': '86400',
 };
 
-export function apiHeaders(): Record<string, string> {
-  return { ...CORS_HEADERS, 'x-cannastack-version': '1' };
+export function apiHeaders(
+  methods = 'GET, HEAD, POST, OPTIONS',
+): Record<string, string> {
+  return {
+    ...CORS_HEADERS,
+    'access-control-allow-methods': methods,
+    'x-cannastack-version': '1',
+  };
+}
+
+export function mergeApiHeaders<T extends Response>(response: T, methods?: string): T {
+  for (const [name, value] of Object.entries(apiHeaders(methods))) {
+    response.headers.set(name, value);
+  }
+  return response;
 }
 
 export function retiredDataResponse() {
@@ -22,7 +34,7 @@ export function retiredDataResponse() {
       ok: false,
       status: 'retired',
       error: RETIREMENT_MESSAGE,
-      active_paid_data_endpoints: 0,
+      published_paid_endpoints: ENDPOINTS.length,
       docs: 'https://cannastack.0x402.sh/docs',
     },
     { status: 410, headers: apiHeaders() },
@@ -31,4 +43,16 @@ export function retiredDataResponse() {
 
 export function preflight() {
   return new NextResponse(null, { status: 204, headers: apiHeaders() });
+}
+
+export function menuPreflight() {
+  return new NextResponse(null, { status: 204, headers: apiHeaders('POST, OPTIONS') });
+}
+
+export function discoveryHeaders(contentType?: string): Record<string, string> {
+  return {
+    'access-control-allow-origin': '*',
+    'cache-control': 'public, max-age=3600',
+    ...(contentType ? { 'content-type': contentType } : {}),
+  };
 }

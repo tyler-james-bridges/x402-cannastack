@@ -39,7 +39,7 @@ test('retired backend routes return direct uncached CORS 410 responses', async (
       ok: false,
       status: 'retired',
       error: RETIRED_MESSAGE,
-      active_paid_data_endpoints: 0,
+      published_paid_endpoints: 3,
       docs: 'https://cannastack.0x402.sh/docs',
     });
   }
