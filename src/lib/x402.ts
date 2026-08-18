@@ -7,6 +7,11 @@ import {
   type VerifyResponse,
 } from '@x402/core/types';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
+import {
+  BUILDER_CODE,
+  builderCodeResourceServerExtension,
+  declareBuilderCodeExtension,
+} from '@x402/extensions/builder-code';
 import type { Network } from '@x402/core/types';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -14,6 +19,7 @@ import { apiHeaders, mergeApiHeaders } from '@/lib/api-response';
 
 // Paid menu resources settle in native USDC on Base.
 export const BASE_NETWORK: Network = 'eip155:8453';
+export const BASE_BUILDER_CODE = 'bc_jhxtiha3' as const;
 
 export const ACTIVE_CHAIN = 'base' as const;
 export const ACTIVE_NETWORK: Network = BASE_NETWORK;
@@ -190,7 +196,9 @@ function createFacilitator(): FacilitatorClient {
 
 function createServer(): x402ResourceServer {
   const client = createFacilitator();
-  return new x402ResourceServer(client).register(ACTIVE_NETWORK, makeScheme());
+  return new x402ResourceServer(client)
+    .register(ACTIVE_NETWORK, makeScheme())
+    .registerExtension(builderCodeResourceServerExtension);
 }
 
 /**
@@ -265,6 +273,9 @@ export function withPayment(
             accepts: [{ scheme: 'exact', payTo, price, network: BASE_NETWORK }],
             description,
             mimeType: 'application/json',
+            extensions: {
+              [BUILDER_CODE]: declareBuilderCodeExtension(BASE_BUILDER_CODE),
+            },
           },
           createServer(),
         );
