@@ -45,7 +45,7 @@
   },
   "overrides": {
     "esbuild": "0.28.1",
-    "postcss": "8.5.12",
+    "postcss": "8.5.23",
     "viem": "2.55.2",
     "ws": "8.21.0"
   }
