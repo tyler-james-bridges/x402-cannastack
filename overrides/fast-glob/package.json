@@ -1,0 +1,7 @@
+{
+  "name": "fast-glob",
+  "version": "3.3.1",
+  "private": true,
+  "description": "Stand-in used by the Next eslint plugin. It has no micromatch or braces dependency.",
+  "main": "index.js"
+}
