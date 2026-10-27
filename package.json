@@ -23,9 +23,9 @@
     "@x402/extensions": "2.18.0",
     "@x402/next": "^2.18.0",
     "dotenv": "^17.4.2",
-    "next": "^16.2.10",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "next": "16.4.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -45,7 +45,7 @@
   },
   "overrides": {
     "esbuild": "0.28.1",
-    "postcss": "8.5.12",
+    "postcss": "8.5.23",
     "viem": "2.55.2",
     "ws": "8.21.0"
   }
